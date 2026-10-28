@@ -45,7 +45,7 @@
   .pill.ok { background: var(--ok); } .pill.error { background: var(--danger); } .pill.off { background: #9AA3B2; } .pill.skipped { background: #9AA3B2; } .pill.test { background: var(--primary); }
   label { display: block; font-weight: 600; font-size: 12px; margin: 14px 0 6px; }
   label .req { color: var(--danger); }
-  input[type=text], input[type=url], input[type=time], select, textarea {
+  input[type=text], input[type=password], input[type=url], input[type=time], select, textarea {
     width: 100%; font: inherit; color: var(--text); background: var(--input); border: 1px solid var(--border); border-radius: 12px; padding: 9px 12px;
   }
   textarea { min-height: 90px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
@@ -92,9 +92,15 @@
 <main>
   <section id="loginView" class="card login hidden">
     <img src="/brand/iso-color.svg" alt="">
-    <h2>Ingresá con tu cuenta de Janis</h2>
-    <p class="muted">El acceso está restringido a usuarios de <span id="ssoDomain">janiscommerce.com</span>.</p>
-    <div id="googleBtn" style="display:flex;justify-content:center;margin-top:16px;"></div>
+    <h2>Ingresá a CareSubscription</h2>
+    <p class="muted">Acceso restringido al equipo de Janis.</p>
+    <form id="loginForm" style="text-align:left;">
+      <label for="l-email">Tu correo de <span id="userDomain">janiscommerce.com</span></label>
+      <input type="text" id="l-email" autocomplete="email" inputmode="email">
+      <label for="l-key">Clave de acceso</label>
+      <input type="password" id="l-key" autocomplete="current-password">
+      <div style="margin-top:16px;"><button type="submit" class="primary" id="loginBtn" style="width:100%;">Ingresar</button></div>
+    </form>
     <div id="loginMsg"></div>
   </section>
 
@@ -107,6 +113,7 @@
       <span class="spacer"></span>
       <button class="primary" id="newBtn">+ Nueva suscripción</button>
     </div>
+    <div id="mailBanner" class="msg warn hidden">El envío de correo todavía no está configurado: por ahora se pueden crear suscripciones y ver la vista previa, pero no se envía nada (ni programado ni de prueba).</div>
     <div id="listMsg"></div>
     <div class="card table-wrap">
       <table class="list">
@@ -213,7 +220,7 @@
   const $ = (id) => document.getElementById(id);
   const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const DEFAULT_TZ = 'America/Santiago';
-  const state = { user: null, subscriptions: [], modules: [], organizations: [], editing: null };
+  const state = { user: null, mailEnabled: false, subscriptions: [], modules: [], organizations: [], editing: null };
 
   // ---- Tema claro/oscuro (manual de marca) ----
   function applyTheme(theme) {
@@ -267,7 +274,7 @@
 
   document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => b.closest('dialog').close(); });
 
-  // ---- Login (Google Workspace) ----
+  // ---- Acceso con clave compartida ----
   function showLogin() {
     $('appView').classList.add('hidden');
     $('loginView').classList.remove('hidden');
@@ -276,34 +283,28 @@
   }
 
   async function initAuth() {
-    const { user, googleClientId, ssoDomain } = await api('/api/auth');
-    $('ssoDomain').textContent = ssoDomain;
+    const { user, userDomain, mailEnabled, accessConfigured } = await api('/api/auth');
+    state.mailEnabled = mailEnabled;
+    $('userDomain').textContent = userDomain;
     if (user) return startApp(user);
 
     showLogin();
-    if (!googleClientId) {
-      showMsg('loginMsg', 'err', 'Falta configurar GOOGLE_CLIENT_ID en el despliegue.');
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.onload = () => {
-      google.accounts.id.initialize({
-        client_id: googleClientId,
-        hd: ssoDomain,
-        callback: async ({ credential }) => {
-          try {
-            const { user: logged } = await api('/api/auth', { method: 'POST', body: { credential } });
-            startApp(logged);
-          } catch (error) {
-            showMsg('loginMsg', 'err', error.message);
-          }
-        },
-      });
-      google.accounts.id.renderButton($('googleBtn'), { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with' });
-    };
-    document.head.appendChild(script);
+    if (!accessConfigured) showMsg('loginMsg', 'err', 'Falta configurar ACCESS_KEY (mínimo 16 caracteres) en el despliegue.');
   }
+
+  $('loginForm').onsubmit = (event) => {
+    event.preventDefault();
+    busy($('loginBtn'), async () => {
+      clearMsg('loginMsg');
+      try {
+        const { user } = await api('/api/auth', { method: 'POST', body: { email: $('l-email').value, accessKey: $('l-key').value } });
+        $('l-key').value = '';
+        startApp(user);
+      } catch (error) {
+        showMsg('loginMsg', 'err', error.message);
+      }
+    });
+  };
 
   $('logoutBtn').onclick = async () => { await api('/api/auth', { method: 'DELETE' }); location.reload(); };
 
@@ -313,6 +314,9 @@
     $('appView').classList.remove('hidden');
     $('logoutBtn').classList.remove('hidden');
     $('userEmail').textContent = user.email;
+    $('mailBanner').classList.toggle('hidden', state.mailEnabled);
+    $('testBtn').disabled = !state.mailEnabled;
+    $('testBtn').title = state.mailEnabled ? '' : 'El envío de correo todavía no está configurado';
     await loadList();
   }
 

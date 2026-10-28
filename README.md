@@ -10,7 +10,7 @@ El repo está organizado en **módulos** (apartados); cada uno tiene su configur
 ## Arquitectura
 
 ```
-public/index.html          UI (login con Google Workspace, ABM, vista previa, prueba, historial)
+public/index.html          UI (acceso con clave, ABM, vista previa, prueba, historial)
 api/                       Funciones serverless (Vercel, Node)
   auth.js                  login / logout / sesión
   subscriptions.js         ABM + ?action=preview|test + ?view=history
@@ -18,7 +18,7 @@ api/                       Funciones serverless (Vercel, Node)
   dispatch.js              disparado cada hora: envía las suscripciones que tocan
 lib/                       Común a todos los módulos
   jira.js                  cliente Jira/JSM con reintentos y paginación
-  mailer.js                envío SMTP (AWS SES u otro relay) con reintentos
+  mailer.js                envío SMTP (AWS SES u otro relay) con reintentos; opcional
   schedule.js              días + hora + zona horaria -> próximo envío
   dispatcher.js / runner.js  ejecución, historial, marca de error y aviso al creador
   recipients.js            validación de correos y dominios permitidos
@@ -63,7 +63,8 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
 
 ## Seguridad y privacidad (ISO 27001/27002, GDPR)
 
-- **Acceso**: la UI y la API requieren login con Google Workspace, limitado al dominio `SSO_DOMAIN`. El ID token se verifica en el servidor, que luego emite una cookie de sesión HttpOnly, Secure y SameSite=Lax, firmada y válida por 12 h.
+- **Acceso**: la UI y la API requieren una clave compartida (`ACCESS_KEY`) y que el usuario declare su correo de `USER_DOMAIN`, que se usa para la auditoría y para "Enviar prueba". El servidor emite una cookie de sesión HttpOnly, Secure y SameSite=Lax, firmada y válida por 12 h. Rotar la clave cierra todas las sesiones. Sin `ACCESS_KEY` no se puede entrar: la app muestra tickets y destinatarios de clientes, así que nunca queda pública.
+  - Limitación: el correo declarado no se verifica. Para tener identidad verificada, el siguiente paso es SSO con Google Workspace.
 - **Destinatarios**: deben tener formato válido y un dominio de la lista permitida, que es `ALLOWED_RECIPIENT_DOMAINS` más los dominios del cliente cargados para esa Organization desde la UI. Se validan al guardar y otra vez en cada envío.
 - **Enviar prueba**: se envía solo a quien está configurando.
 - **Auditoría**: se registra quién creó, modificó o borró cada suscripción (y los dominios de cada Organization), cuándo y qué campos cambió.
@@ -74,15 +75,15 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
 ## Puesta en marcha
 
 1. Crear el proyecto en Vercel apuntando a este repo y una base en Neon.
-2. Cargar las variables de `.env.example` en Vercel:
+2. Cargar en Vercel las variables obligatorias de `.env.example`:
    - `DATABASE_URL`
    - `JIRA_EMAIL` y `JIRA_API_TOKEN`: cuenta de servicio con acceso a JSM.
-   - `SMTP_*` y `MAIL_FROM`
-   - `GOOGLE_CLIENT_ID`: OAuth client de tipo *Web* en Google Cloud, con el dominio del deploy como *Authorized JavaScript origin*.
-   - `SESSION_SECRET`
-   - `CRON_SECRET`
-3. En GitHub, cargar los secrets `DISPATCH_URL` (`https://<deploy>/api/dispatch`) y `CRON_SECRET` para el workflow horario.
-4. Tests: `npm install && npm test`.
+   - `ACCESS_KEY`: mínimo 16 caracteres aleatorios. Se comparte por un canal seguro con quienes usan la app.
+3. Listo para crear suscripciones y usar la vista previa. **Sin SMTP no se envía ningún correo** (ni programado ni de prueba) y la UI lo avisa.
+4. Para activar los envíos, más adelante:
+   - Cargar `SMTP_*`, `MAIL_FROM` y `CRON_SECRET` en Vercel.
+   - Cargar los secrets `DISPATCH_URL` (`https://<deploy>/api/dispatch`) y `CRON_SECRET` en GitHub, para el workflow horario.
+5. Tests: `npm install && npm test`.
 
 ## Cómo sumar un módulo nuevo
 

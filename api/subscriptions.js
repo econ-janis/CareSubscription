@@ -2,6 +2,7 @@ const { requireUser } = require('../lib/auth');
 const { validateSubscriptionInput } = require('../lib/subscriptions');
 const { runSubscription } = require('../lib/runner');
 const { getModule, listModules } = require('../modules');
+const { isMailConfigured } = require('../lib/mailer');
 const db = require('../lib/db');
 const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 
@@ -51,6 +52,7 @@ async function handleAction(action, req, res, user) {
   }
 
   if (action === 'test') {
+    if (!isMailConfigured()) throw new HttpError(503, 'El envío de correo todavía no está configurado; por ahora solo está disponible la vista previa');
     const outcome = await runSubscription(subscription, { kind: 'test', triggeredBy: user.email, testRecipient: user.email });
     if (outcome.result !== 'ok') throw new HttpError(502, `No se pudo enviar la prueba: ${outcome.error}`);
     sendJson(res, 200, { ok: true, sentTo: user.email, warnings });

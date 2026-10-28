@@ -1,20 +1,22 @@
-const { verifyGoogleCredential, createSessionCookie, clearSessionCookie, getSessionUser, ssoDomain } = require('../lib/auth');
+const { verifyAccess, createSessionCookie, clearSessionCookie, getSessionUser, userDomain } = require('../lib/auth');
+const { isMailConfigured } = require('../lib/mailer');
 const { sendJson, readBody, handleError } = require('../lib/http');
 
-// GET    /api/auth -> { user, googleClientId, ssoDomain }
-// POST   /api/auth { credential } -> login con el ID token de Google
+// GET    /api/auth -> { user, userDomain, mailEnabled, accessConfigured }
+// POST   /api/auth { accessKey, email } -> login con la clave compartida
 // DELETE /api/auth -> logout
 module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
-      const user = await getSessionUser(req);
-      sendJson(res, 200, { user, googleClientId: process.env.GOOGLE_CLIENT_ID || '', ssoDomain: ssoDomain() });
+      const accessConfigured = (process.env.ACCESS_KEY || '').length >= 16;
+      const user = accessConfigured ? await getSessionUser(req) : null;
+      sendJson(res, 200, { user, userDomain: userDomain(), mailEnabled: isMailConfigured(), accessConfigured });
       return;
     }
 
     if (req.method === 'POST') {
-      const { credential } = readBody(req);
-      const user = await verifyGoogleCredential(String(credential || ''));
+      const { accessKey, email } = readBody(req);
+      const user = verifyAccess(String(accessKey || ''), email);
       res.setHeader('Set-Cookie', await createSessionCookie(user));
       sendJson(res, 200, { user });
       return;

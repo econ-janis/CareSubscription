@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 // Dispatcher con db y runner simulados (sin red ni base de datos).
-function loadDispatcher({ subscriptions, outcomes }) {
+function loadDispatcher({ subscriptions, outcomes, mailConfigured = true }) {
   const calls = { marked: [], runs: [] };
   const byId = new Map(subscriptions.map((s) => [s.id, s]));
   const stub = (file, exports) => {
@@ -17,6 +17,7 @@ function loadDispatcher({ subscriptions, outcomes }) {
     releaseLock: async () => {},
     markSlotDone: async (id, slot) => calls.marked.push([id, slot.toISOString()]),
   });
+  stub('lib/mailer.js', { isMailConfigured: () => mailConfigured });
   stub('lib/runner.js', {
     runSubscription: async (s, options) => {
       calls.runs.push([s.id, options.slotAt.toISOString()]);
@@ -46,4 +47,18 @@ test('envía slots pendientes; un fallo transitorio no marca el slot (se reinten
   assert.deepEqual(calls.marked.map(([id]) => id), [1, 4]);
   assert.equal(summary.sent, 1);
   assert.equal(summary.failed, 2);
+});
+
+test('sin SMTP configurado no envía ni consulta nada', async () => {
+  const { dispatch, calls } = loadDispatcher({
+    subscriptions: [{ ...base, id: 1, lastSlotAt: null }],
+    outcomes: { 1: { result: 'ok' } },
+    mailConfigured: false,
+  });
+
+  const summary = await dispatch({ now: new Date('2026-10-28T12:10:00Z') });
+
+  assert.equal(summary.mailDisabled, true);
+  assert.deepEqual(calls.runs, []);
+  assert.deepEqual(calls.marked, []);
 });
