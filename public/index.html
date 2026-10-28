@@ -199,6 +199,23 @@
   </form>
 </dialog>
 
+<dialog id="testDlg" style="width:min(460px, calc(100vw - 32px));">
+  <form id="testForm" novalidate>
+    <div class="dlg-head"><h3>Enviar prueba</h3><button type="button" class="icon-btn" data-close>✕</button></div>
+    <div class="dlg-body">
+      <label for="t-email">¿A qué correo querés que llegue?</label>
+      <input type="text" id="t-email" inputmode="email" autocomplete="email">
+      <div class="muted" style="margin-top:6px;">Un solo correo, de un dominio permitido para esta Organization. Se envía el reporte con los datos actuales; no se guarda la suscripción.</div>
+      <div id="testMsg"></div>
+    </div>
+    <div class="dlg-foot">
+      <span class="spacer"></span>
+      <button type="button" data-close>Cancelar</button>
+      <button type="submit" class="primary" id="testSendBtn">Enviar</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="previewDlg">
   <div class="dlg-head"><h3 id="previewTitle">Vista previa</h3><button type="button" class="icon-btn" data-close>✕</button></div>
   <div class="dlg-body">
@@ -560,15 +577,30 @@
     }
   });
 
-  $('testBtn').onclick = () => busy($('testBtn'), async () => {
+  // Pregunta a qué correo enviar la prueba (por defecto, el del usuario).
+  let lastTestRecipient = '';
+  $('testBtn').onclick = () => {
     clearMsg('formMsg');
-    try {
-      const { sentTo } = await api('/api/subscriptions?action=test', { method: 'POST', body: formPayload() });
-      showMsg('formMsg', 'ok', `Prueba enviada solo a ${sentTo}.`);
-    } catch (error) {
-      errorMsg('formMsg', error);
-    }
-  });
+    clearMsg('testMsg');
+    $('t-email').value = lastTestRecipient || state.user.email;
+    $('testDlg').showModal();
+    $('t-email').select();
+  };
+
+  $('testForm').onsubmit = (event) => {
+    event.preventDefault();
+    busy($('testSendBtn'), async () => {
+      clearMsg('testMsg');
+      try {
+        const { sentTo } = await api('/api/subscriptions?action=test', { method: 'POST', body: { ...formPayload(), testRecipient: $('t-email').value.trim() } });
+        lastTestRecipient = sentTo;
+        $('testDlg').close();
+        showMsg('formMsg', 'ok', `Prueba enviada solo a ${sentTo}.`);
+      } catch (error) {
+        errorMsg('testMsg', error);
+      }
+    });
+  };
 
   // ---- Historial ----
   const KIND = { scheduled: 'Programado', test: 'Prueba', slack: 'Preaviso Slack' };
