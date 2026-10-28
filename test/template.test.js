@@ -76,3 +76,10 @@ test('renderSnapshot reconstruye el correo desde el snapshot guardado (JSON)', a
   assert.ok(html.includes('data:image/png;base64,'));
   assert.ok(html.includes('Corte: 28 oct 2026'));
 });
+
+test('el correo se marca como "no traducir" (Gmail lo traducía solo)', () => {
+  const html = render([]);
+  assert.ok(html.includes('translate="no"'));
+  assert.ok(html.includes('<meta name="google" content="notranslate">'));
+  assert.ok(html.includes('class="cs-bg notranslate"'));
+});
