@@ -148,9 +148,9 @@
         </div>
       </div>
 
-      <label for="f-jql">JQL <span class="req">*</span> <span class="muted">— <code>{organization}</code> se reemplaza por la Organization elegida</span></label>
+      <label for="f-jql">JQL <span class="req">*</span> <span class="muted">— se usa tal cual en Jira (opcional: <code>{organization}</code> se reemplaza por la Organization elegida)</span></label>
       <textarea id="f-jql" spellcheck="false"></textarea>
-      <div id="jqlWarn" class="msg warn hidden">El JQL no contiene <code>{organization}</code>: el reporte no quedaría filtrado por la Organization elegida.</div>
+      <div id="jqlWarn" class="msg warn hidden">El JQL no filtra por Organization: el reporte incluiría tickets de todos los clientes del proyecto y se enviaría a los destinatarios de esta suscripción.</div>
 
       <label for="f-recipients">Destinatarios <span class="req">*</span> <span class="muted">(uno por línea o separados por coma)</span></label>
       <textarea id="f-recipients" style="min-height:70px;font-family:inherit;font-size:13px;" spellcheck="false"></textarea>
@@ -417,7 +417,12 @@
   const zones = (Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [DEFAULT_TZ]);
   $('f-tz').innerHTML = zones.map((z) => `<option>${esc(z)}</option>`).join('');
 
-  $('f-jql').oninput = () => $('jqlWarn').classList.toggle('hidden', !$('f-jql').value.trim() || $('f-jql').value.includes('{organization}'));
+  // Misma regla que filtersByOrganization (modules/ticket-report/jql.js).
+  const ORGANIZATIONS_CLAUSE = /\borganizations\s*(=|!=|!~|~|\bin\b|\bnot\s+in\b|\bis\b)/i;
+  $('f-jql').oninput = () => {
+    const jql = $('f-jql').value;
+    $('jqlWarn').classList.toggle('hidden', !jql.trim() || jql.includes('{organization}') || ORGANIZATIONS_CLAUSE.test(jql));
+  };
 
   function openForm(subscription) {
     state.editing = subscription || null;
