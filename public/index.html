@@ -401,11 +401,12 @@
       <td>${statusPill(s)}${s.status === 'error' ? `<div class="muted" style="color:var(--danger);max-width:240px;">${esc(s.lastError)}</div>` : ''}</td>
       <td>${fmtDateTime(s.updatedAt)}<div class="muted">${esc(s.updatedBy)}</div></td>
       <td style="white-space:nowrap;">
-        <button class="link" data-edit="${s.id}">Editar</button><button class="link" data-history="${s.id}">Historial</button>
+        <button class="link" data-edit="${s.id}">Editar</button><button class="link" data-copy="${s.id}">Copiar</button><button class="link" data-history="${s.id}">Historial</button>
         <div><button class="slack-btn" data-slack="${s.id}" ${state.slackEnabled ? '' : 'disabled'} title="${state.slackEnabled ? `Preaviso a ${esc(state.slackChannel)} antes del envío a Consulting` : 'Slack todavía no está configurado (SLACK_BOT_TOKEN)'}">💬 Avisar en Slack</button></div>
       </td>
     </tr>`).join('');
     body.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => openForm(state.subscriptions.find((s) => s.id === Number(b.dataset.edit))); });
+    body.querySelectorAll('[data-copy]').forEach((b) => { b.onclick = () => openForm(state.subscriptions.find((s) => s.id === Number(b.dataset.copy)), { copy: true }); });
     body.querySelectorAll('[data-history]').forEach((b) => { b.onclick = () => openHistory(state.subscriptions.find((s) => s.id === Number(b.dataset.history))); });
     body.querySelectorAll('[data-slack]').forEach((b) => { b.onclick = () => sendSlackPreview(state.subscriptions.find((s) => s.id === Number(b.dataset.slack)), b); });
   }
@@ -426,14 +427,15 @@
   // ---- Organizations y dominios ----
   async function loadOrganizations(refresh = false) {
     const select = $('f-org');
-    const current = select.value || (state.editing && state.editing.organization.id) || '';
+    const source = state.formSource;
+    const current = select.value || (source && source.organization.id) || '';
     try {
       const { organizations, fetchedAt } = await api(`/api/organizations${refresh ? '?refresh=1' : ''}`);
       state.organizations = organizations;
       $('orgsFetched').textContent = `Lista de Jira actualizada: ${fmtDateTime(fetchedAt)}`;
       select.innerHTML = '<option value="">Elegí una Organization…</option>' + organizations.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join('');
-      if (current && !organizations.some((o) => o.id === current) && state.editing) {
-        select.insertAdjacentHTML('beforeend', `<option value="${esc(current)}">${esc(state.editing.organization.name)} (no encontrada en Jira)</option>`);
+      if (current && !organizations.some((o) => o.id === current) && source && source.organization.name) {
+        select.insertAdjacentHTML('beforeend', `<option value="${esc(current)}">${esc(source.organization.name)} (no encontrada en Jira)</option>`);
       }
       select.value = current;
       loadDomains();
@@ -484,13 +486,16 @@
     $('jqlWarn').classList.toggle('hidden', !jql.trim() || jql.includes('{organization}') || ORGANIZATIONS_CLAUSE.test(jql));
   };
 
-  function openForm(subscription) {
-    state.editing = subscription || null;
+  // copy: abre "Nueva suscripción" con los datos de `subscription` (no la
+  // modifica; al guardar se crea otra, con su propio historial).
+  function openForm(subscription, { copy = false } = {}) {
+    state.editing = subscription && !copy ? subscription : null;
     const defaults = (state.modules.find((m) => m.id === 'ticket-report') || {}).defaultConfig || {};
     const s = subscription || { title: '', organization: { id: '' }, config: defaults, recipients: [], subject: '', schedule: { days: [1], time: '09:00', timezone: DEFAULT_TZ }, language: 'es', active: true };
+    state.formSource = s;
 
-    $('formTitle').textContent = subscription ? 'Editar suscripción' : 'Nueva suscripción';
-    $('f-title').value = s.title;
+    $('formTitle').textContent = copy ? 'Nueva suscripción (copia)' : (subscription ? 'Editar suscripción' : 'Nueva suscripción');
+    $('f-title').value = copy ? `${s.title} (copia)` : s.title;
     $('f-org').value = s.organization.id;
     $('f-logo').value = s.config.logoUrl || '';
     $('f-jql').value = s.config.jql || '';
@@ -502,11 +507,13 @@
     $('f-active').checked = s.active;
     $('f-skip').checked = Boolean(s.config.skipIfEmpty);
     $('f-days').querySelectorAll('input').forEach((i) => { i.checked = s.schedule.days.includes(Number(i.value)); });
-    $('deleteBtn').classList.toggle('hidden', !subscription);
+    $('deleteBtn').classList.toggle('hidden', !state.editing);
     $('f-jql').oninput();
     clearMsg('formMsg');
     $('formDlg').showModal();
+    $('f-org').innerHTML = '<option value="">Cargando…</option>';
     loadOrganizations();
+    if (copy) showMsg('formMsg', 'ok', 'Copia de la suscripción: ajustá lo que necesites y guardá para crearla.');
   }
   $('newBtn').onclick = () => openForm(null);
 
