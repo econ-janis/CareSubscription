@@ -1,0 +1,24 @@
+name: Dispatch suscripciones
+
+# Dispara el envío de las suscripciones pendientes cada hora. Se usa GitHub
+# Actions porque el plan Hobby de Vercel solo permite crons diarios; en plan
+# Pro se puede reemplazar por un cron horario en vercel.json.
+# Secrets del repo: DISPATCH_URL (https://<deploy>/api/dispatch) y CRON_SECRET.
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Llamar al dispatcher
+        env:
+          DISPATCH_URL: ${{ secrets.DISPATCH_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsS --max-time 120 -X POST -H "Authorization: Bearer ${CRON_SECRET}" "${DISPATCH_URL}"

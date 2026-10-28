@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CareSubscription</title>
+<link rel="icon" href="/brand/iso-color.svg" id="favicon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F7FA; --surface: #FFFFFF; --text: #001233; --muted: #33415C; --border: #E6E9EF;
+    --primary: #2979FF; --primary-hover: #1759FF; --orange: #FF6E08; --danger: #FF3200; --ok: #7CB83A;
+    --input: #FFFFFF; --shadow: 0 1px 3px rgba(0, 18, 51, .08);
+  }
+  :root[data-theme="dark"] {
+    --bg: #001233; --surface: #0A1F44; --text: #FFFFFF; --muted: #B7C1D6; --border: #22365E;
+    --input: #06183A; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Montserrat, system-ui, sans-serif; font-size: 14px; }
+  header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  header img { height: 30px; }
+  header h1 { font-size: 16px; font-weight: 700; margin: 0; flex: 1; }
+  header .user { color: var(--muted); font-size: 13px; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+  h2 { font-size: 18px; margin: 0; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+  button, .btn { font: inherit; font-weight: 600; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 8px 16px; cursor: pointer; }
+  button:hover { border-color: var(--primary); }
+  button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  button.primary:hover { background: var(--primary-hover); }
+  button.danger { color: var(--danger); }
+  button.link { border: 0; background: none; color: var(--primary); padding: 4px 6px; }
+  button:disabled { opacity: .5; cursor: progress; }
+  .icon-btn { padding: 6px 10px; }
+  table.list { width: 100%; border-collapse: collapse; }
+  table.list th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--muted); padding: 8px; border-bottom: 2px solid var(--border); }
+  table.list td { padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .table-wrap { overflow-x: auto; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; }
+  .pill.ok { background: var(--ok); } .pill.error { background: var(--danger); } .pill.off { background: #9AA3B2; } .pill.skipped { background: #9AA3B2; } .pill.test { background: var(--primary); }
+  label { display: block; font-weight: 600; font-size: 12px; margin: 14px 0 6px; }
+  label .req { color: var(--danger); }
+  input[type=text], input[type=url], input[type=time], select, textarea {
+    width: 100%; font: inherit; color: var(--text); background: var(--input); border: 1px solid var(--border); border-radius: 12px; padding: 9px 12px;
+  }
+  textarea { min-height: 90px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+  .days { display: flex; gap: 6px; flex-wrap: wrap; }
+  .days label { margin: 0; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 9999px; padding: 6px 10px; font-weight: 500; cursor: pointer; }
+  .days input:checked + span { color: var(--primary); font-weight: 700; }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; margin: 14px 16px 0 0; }
+  .msg { border-radius: 12px; padding: 10px 14px; margin: 10px 0; font-size: 13px; }
+  .msg.warn { background: rgba(255, 110, 8, .12); color: var(--text); border: 1px solid rgba(255, 110, 8, .4); }
+  .msg.err { background: rgba(255, 50, 0, .10); color: var(--text); border: 1px solid rgba(255, 50, 0, .4); }
+  .msg.ok { background: rgba(124, 184, 58, .14); color: var(--text); border: 1px solid rgba(124, 184, 58, .5); }
+  .msg ul { margin: 4px 0 0; padding-left: 18px; }
+  .hidden { display: none !important; }
+  dialog { border: 0; border-radius: 16px; padding: 0; width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); background: var(--surface); color: var(--text); }
+  dialog::backdrop { background: rgba(0, 18, 51, .55); }
+  .dlg-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .dlg-head h3 { margin: 0; font-size: 16px; flex: 1; }
+  .dlg-body { padding: 4px 20px 20px; }
+  .dlg-foot { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 20px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--surface); }
+  iframe.preview { width: 100%; height: 70vh; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+  .login { max-width: 420px; margin: 12vh auto; text-align: center; }
+  .login img { height: 40px; margin-bottom: 16px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chip { background: var(--bg); border: 1px solid var(--border); border-radius: 9999px; padding: 2px 10px; font-size: 12px; }
+  .domains-box { margin-top: 8px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 12px; }
+  .domains-box .row input { flex: 1; min-width: 200px; }
+  @media (max-width: 720px) {
+    .grid { grid-template-columns: 1fr; }
+    header { padding: 12px 16px; }
+    header .user { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <img id="logo" src="/brand/logo-light.svg" alt="Janis Commerce">
+  <h1>CareSubscription</h1>
+  <span class="user" id="userEmail"></span>
+  <button class="icon-btn" id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+  <button class="hidden" id="logoutBtn">Salir</button>
+</header>
+
+<main>
+  <section id="loginView" class="card login hidden">
+    <img src="/brand/iso-color.svg" alt="">
+    <h2>Ingresá con tu cuenta de Janis</h2>
+    <p class="muted">El acceso está restringido a usuarios de <span id="ssoDomain">janiscommerce.com</span>.</p>
+    <div id="googleBtn" style="display:flex;justify-content:center;margin-top:16px;"></div>
+    <div id="loginMsg"></div>
+  </section>
+
+  <section id="appView" class="hidden">
+    <div class="row" style="margin-bottom:16px;">
+      <div>
+        <h2>Suscripciones</h2>
+        <div class="muted">Reporte de tickets de los últimos 3 meses por Organization, enviado por correo de forma programada.</div>
+      </div>
+      <span class="spacer"></span>
+      <button class="primary" id="newBtn">+ Nueva suscripción</button>
+    </div>
+    <div id="listMsg"></div>
+    <div class="card table-wrap">
+      <table class="list">
+        <thead><tr><th>Título</th><th>Organization</th><th>Frecuencia</th><th>Destinatarios</th><th>Estado</th><th>Última modificación</th><th></th></tr></thead>
+        <tbody id="listBody"><tr><td colspan="7" class="muted">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- Formulario de suscripción -->
+<dialog id="formDlg">
+  <form id="form" novalidate>
+    <div class="dlg-head"><h3 id="formTitle">Nueva suscripción</h3><button type="button" class="icon-btn" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div id="formMsg"></div>
+      <label for="f-title">Título <span class="req">*</span></label>
+      <input type="text" id="f-title" maxlength="200" placeholder="Care Weekly Status — Cliente · Plan">
+
+      <div class="grid">
+        <div>
+          <label for="f-org">Organization <span class="req">*</span></label>
+          <div class="row" style="flex-wrap:nowrap;">
+            <select id="f-org"><option value="">Cargando…</option></select>
+            <button type="button" class="icon-btn" id="refreshOrgs" title="Refrescar lista desde Jira">↻</button>
+          </div>
+          <div class="muted" id="orgsFetched"></div>
+        </div>
+        <div>
+          <label for="f-logo">Logo URL <span class="muted">(opcional · HTTPS, PNG/JPEG, máx. 500 KB)</span></label>
+          <input type="url" id="f-logo" placeholder="https://… (vacío = isotipo de Janis)">
+        </div>
+      </div>
+
+      <label for="f-jql">JQL <span class="req">*</span> <span class="muted">— <code>{organization}</code> se reemplaza por la Organization elegida</span></label>
+      <textarea id="f-jql" spellcheck="false"></textarea>
+      <div id="jqlWarn" class="msg warn hidden">El JQL no contiene <code>{organization}</code>: el reporte no quedaría filtrado por la Organization elegida.</div>
+
+      <label for="f-recipients">Destinatarios <span class="req">*</span> <span class="muted">(uno por línea o separados por coma)</span></label>
+      <textarea id="f-recipients" style="min-height:70px;font-family:inherit;font-size:13px;" spellcheck="false"></textarea>
+      <div class="domains-box">
+        <div class="muted">Dominios permitidos para esta Organization:</div>
+        <div class="chips" id="domainChips"></div>
+        <div class="row" style="margin-top:8px;">
+          <input type="text" id="f-domains" placeholder="Dominios del cliente, ej: cliente.com, cliente.com.ar" disabled>
+          <button type="button" id="saveDomains" disabled>Guardar dominios</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <label for="f-subject">Asunto del correo <span class="muted">(opcional · por defecto: Título · fecha de corte)</span></label>
+          <input type="text" id="f-subject" maxlength="250">
+        </div>
+        <div>
+          <label for="f-lang">Idioma <span class="req">*</span></label>
+          <select id="f-lang"><option value="es">Español</option><option value="pt">Português</option></select>
+        </div>
+      </div>
+
+      <label>Frecuencia <span class="req">*</span></label>
+      <div class="days" id="f-days"></div>
+      <div class="grid">
+        <div><label for="f-time">Hora</label><input type="time" id="f-time" value="09:00"></div>
+        <div><label for="f-tz">Zona horaria</label><select id="f-tz"></select></div>
+      </div>
+
+      <div>
+        <label class="check"><input type="checkbox" id="f-active" checked> Activa</label>
+        <label class="check"><input type="checkbox" id="f-skip"> No enviar si no hay tickets en el período</label>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="previewBtn">Vista previa</button>
+      <button type="button" id="testBtn">Enviar prueba</button>
+      <span class="spacer"></span>
+      <button type="button" class="danger hidden" id="deleteBtn">Eliminar</button>
+      <button type="button" data-close>Cancelar</button>
+      <button type="submit" class="primary" id="saveBtn">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="previewDlg">
+  <div class="dlg-head"><h3 id="previewTitle">Vista previa</h3><button type="button" class="icon-btn" data-close>✕</button></div>
+  <div class="dlg-body">
+    <div id="previewMsg"></div>
+    <iframe class="preview" id="previewFrame" sandbox="allow-popups allow-popups-to-escape-sandbox" title="Vista previa del correo"></iframe>
+  </div>
+</dialog>
+
+<dialog id="historyDlg">
+  <div class="dlg-head"><h3 id="historyTitle">Historial</h3><button type="button" class="icon-btn" data-close>✕</button></div>
+  <div class="dlg-body">
+    <h4>Envíos</h4>
+    <div class="table-wrap"><table class="list"><thead><tr><th>Fecha</th><th>Tipo</th><th>Tickets</th><th>Destinatarios</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+    <h4 style="margin-top:24px;">Auditoría</h4>
+    <div class="table-wrap"><table class="list"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Campos</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const DEFAULT_TZ = 'America/Santiago';
+  const state = { user: null, subscriptions: [], modules: [], organizations: [], editing: null };
+
+  // ---- Tema claro/oscuro (manual de marca) ----
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    $('logo').src = theme === 'dark' ? '/brand/logo-dark.svg' : '/brand/logo-light.svg';
+    $('favicon').href = theme === 'dark' ? '/brand/iso-white.svg' : '/brand/iso-color.svg';
+    $('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+  let theme = 'light';
+  try { theme = localStorage.getItem('janis-theme') || 'light'; } catch {}
+  applyTheme(theme);
+  $('themeToggle').onclick = () => {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    applyTheme(theme);
+    try { localStorage.setItem('janis-theme', theme); } catch {}
+  };
+
+  // ---- Helpers ----
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtDateTime = (v) => v ? new Date(v).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+  async function api(path, options = {}) {
+    const response = await fetch(path, {
+      method: options.method || 'GET',
+      headers: options.body ? { 'Content-Type': 'application/json' } : {},
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      credentials: 'same-origin',
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 401 && !path.startsWith('/api/auth')) { showLogin(); }
+    if (!response.ok) {
+      const error = new Error(payload.error || `Error ${response.status}`);
+      error.payload = payload;
+      throw error;
+    }
+    return payload;
+  }
+
+  function showMsg(target, kind, title, items = []) {
+    $(target).innerHTML = `<div class="msg ${kind}">${esc(title)}${items.length ? `<ul>${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}</div>`;
+  }
+  const clearMsg = (target) => { $(target).innerHTML = ''; };
+  function errorMsg(target, error) {
+    showMsg(target, 'err', error.message, [...((error.payload && error.payload.errors) || []), ...((error.payload && error.payload.warnings) || [])]);
+  }
+
+  async function busy(button, fn) {
+    button.disabled = true;
+    try { return await fn(); } finally { button.disabled = false; }
+  }
+
+  document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => b.closest('dialog').close(); });
+
+  // ---- Login (Google Workspace) ----
+  function showLogin() {
+    $('appView').classList.add('hidden');
+    $('loginView').classList.remove('hidden');
+    $('logoutBtn').classList.add('hidden');
+    $('userEmail').textContent = '';
+  }
+
+  async function initAuth() {
+    const { user, googleClientId, ssoDomain } = await api('/api/auth');
+    $('ssoDomain').textContent = ssoDomain;
+    if (user) return startApp(user);
+
+    showLogin();
+    if (!googleClientId) {
+      showMsg('loginMsg', 'err', 'Falta configurar GOOGLE_CLIENT_ID en el despliegue.');
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.onload = () => {
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        hd: ssoDomain,
+        callback: async ({ credential }) => {
+          try {
+            const { user: logged } = await api('/api/auth', { method: 'POST', body: { credential } });
+            startApp(logged);
+          } catch (error) {
+            showMsg('loginMsg', 'err', error.message);
+          }
+        },
+      });
+      google.accounts.id.renderButton($('googleBtn'), { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with' });
+    };
+    document.head.appendChild(script);
+  }
+
+  $('logoutBtn').onclick = async () => { await api('/api/auth', { method: 'DELETE' }); location.reload(); };
+
+  async function startApp(user) {
+    state.user = user;
+    $('loginView').classList.add('hidden');
+    $('appView').classList.remove('hidden');
+    $('logoutBtn').classList.remove('hidden');
+    $('userEmail').textContent = user.email;
+    await loadList();
+  }
+
+  // ---- Lista ----
+  function scheduleText(schedule) {
+    const days = schedule.days.map((d) => DAY_NAMES[d]).join(', ');
+    return `${days} · ${schedule.time}<div class="muted">${esc(schedule.timezone)}</div>`;
+  }
+
+  function statusPill(s) {
+    if (!s.active) return '<span class="pill off">Pausada</span>';
+    if (s.status === 'error') return `<span class="pill error" title="${esc(s.lastError)}">Error</span>`;
+    return '<span class="pill ok">Activa</span>';
+  }
+
+  async function loadList() {
+    try {
+      const { subscriptions, modules } = await api('/api/subscriptions');
+      state.subscriptions = subscriptions;
+      state.modules = modules;
+      clearMsg('listMsg');
+      renderList();
+    } catch (error) {
+      errorMsg('listMsg', error);
+    }
+  }
+
+  function renderList() {
+    const body = $('listBody');
+    if (!state.subscriptions.length) {
+      body.innerHTML = '<tr><td colspan="7" class="muted">Todavía no hay suscripciones.</td></tr>';
+      return;
+    }
+    body.innerHTML = state.subscriptions.map((s) => `<tr>
+      <td><strong>${esc(s.title)}</strong>${s.status === 'error' ? `<div class="muted" style="color:var(--danger)">${esc(s.lastError)}</div>` : ''}</td>
+      <td>${esc(s.organization.name)}</td>
+      <td>${scheduleText(s.schedule)}</td>
+      <td>${s.recipients.length}</td>
+      <td>${statusPill(s)}</td>
+      <td>${fmtDateTime(s.updatedAt)}<div class="muted">${esc(s.updatedBy)}</div></td>
+      <td style="white-space:nowrap;"><button class="link" data-edit="${s.id}">Editar</button><button class="link" data-history="${s.id}">Historial</button></td>
+    </tr>`).join('');
+    body.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => openForm(state.subscriptions.find((s) => s.id === Number(b.dataset.edit))); });
+    body.querySelectorAll('[data-history]').forEach((b) => { b.onclick = () => openHistory(state.subscriptions.find((s) => s.id === Number(b.dataset.history))); });
+  }
+
+  // ---- Organizations y dominios ----
+  async function loadOrganizations(refresh = false) {
+    const select = $('f-org');
+    const current = select.value || (state.editing && state.editing.organization.id) || '';
+    try {
+      const { organizations, fetchedAt } = await api(`/api/organizations${refresh ? '?refresh=1' : ''}`);
+      state.organizations = organizations;
+      $('orgsFetched').textContent = `Lista de Jira actualizada: ${fmtDateTime(fetchedAt)}`;
+      select.innerHTML = '<option value="">Elegí una Organization…</option>' + organizations.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join('');
+      if (current && !organizations.some((o) => o.id === current) && state.editing) {
+        select.insertAdjacentHTML('beforeend', `<option value="${esc(current)}">${esc(state.editing.organization.name)} (no encontrada en Jira)</option>`);
+      }
+      select.value = current;
+      loadDomains();
+    } catch (error) {
+      select.innerHTML = '<option value="">No se pudo cargar</option>';
+      errorMsg('formMsg', error);
+    }
+  }
+  $('refreshOrgs').onclick = () => busy($('refreshOrgs'), () => loadOrganizations(true));
+  $('f-org').onchange = loadDomains;
+
+  async function loadDomains() {
+    const orgId = $('f-org').value;
+    $('f-domains').disabled = $('saveDomains').disabled = !orgId;
+    if (!orgId) { $('domainChips').innerHTML = '<span class="muted">Elegí una Organization.</span>'; $('f-domains').value = ''; return; }
+    try {
+      const { global, domains } = await api(`/api/organizations?domains=${encodeURIComponent(orgId)}`);
+      renderDomains(global, domains);
+    } catch (error) {
+      errorMsg('formMsg', error);
+    }
+  }
+
+  function renderDomains(global, domains) {
+    $('domainChips').innerHTML = [...global.map((d) => `<span class="chip">${esc(d)} · global</span>`), ...domains.map((d) => `<span class="chip">${esc(d)}</span>`)].join('');
+    $('f-domains').value = domains.join(', ');
+  }
+
+  $('saveDomains').onclick = () => busy($('saveDomains'), async () => {
+    try {
+      const { global, domains } = await api(`/api/organizations?domains=${encodeURIComponent($('f-org').value)}`, { method: 'PUT', body: { domains: $('f-domains').value } });
+      renderDomains(global, domains);
+      showMsg('formMsg', 'ok', 'Dominios guardados.');
+    } catch (error) {
+      errorMsg('formMsg', error);
+    }
+  });
+
+  // ---- Formulario ----
+  $('f-days').innerHTML = [1, 2, 3, 4, 5, 6, 0].map((d) => `<label><input type="checkbox" value="${d}"><span>${DAY_NAMES[d]}</span></label>`).join('');
+  const zones = (Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [DEFAULT_TZ]);
+  $('f-tz').innerHTML = zones.map((z) => `<option>${esc(z)}</option>`).join('');
+
+  $('f-jql').oninput = () => $('jqlWarn').classList.toggle('hidden', !$('f-jql').value.trim() || $('f-jql').value.includes('{organization}'));
+
+  function openForm(subscription) {
+    state.editing = subscription || null;
+    const defaults = (state.modules.find((m) => m.id === 'ticket-report') || {}).defaultConfig || {};
+    const s = subscription || { title: '', organization: { id: '' }, config: defaults, recipients: [], subject: '', schedule: { days: [1], time: '09:00', timezone: DEFAULT_TZ }, language: 'es', active: true };
+
+    $('formTitle').textContent = subscription ? 'Editar suscripción' : 'Nueva suscripción';
+    $('f-title').value = s.title;
+    $('f-org').value = s.organization.id;
+    $('f-logo').value = s.config.logoUrl || '';
+    $('f-jql').value = s.config.jql || '';
+    $('f-recipients').value = s.recipients.join('\n');
+    $('f-subject').value = s.subject;
+    $('f-lang').value = s.language;
+    $('f-time').value = s.schedule.time;
+    $('f-tz').value = s.schedule.timezone;
+    $('f-active').checked = s.active;
+    $('f-skip').checked = Boolean(s.config.skipIfEmpty);
+    $('f-days').querySelectorAll('input').forEach((i) => { i.checked = s.schedule.days.includes(Number(i.value)); });
+    $('deleteBtn').classList.toggle('hidden', !subscription);
+    $('f-jql').oninput();
+    clearMsg('formMsg');
+    $('formDlg').showModal();
+    loadOrganizations();
+  }
+  $('newBtn').onclick = () => openForm(null);
+
+  function formPayload() {
+    return {
+      id: state.editing ? state.editing.id : undefined,
+      module: 'ticket-report',
+      title: $('f-title').value,
+      organization: { id: $('f-org').value },
+      config: { jql: $('f-jql').value, logoUrl: $('f-logo').value, skipIfEmpty: $('f-skip').checked },
+      recipients: $('f-recipients').value,
+      subject: $('f-subject').value,
+      language: $('f-lang').value,
+      schedule: {
+        days: [...$('f-days').querySelectorAll('input:checked')].map((i) => Number(i.value)),
+        time: $('f-time').value,
+        timezone: $('f-tz').value,
+      },
+      active: $('f-active').checked,
+    };
+  }
+
+  $('form').onsubmit = (event) => {
+    event.preventDefault();
+    busy($('saveBtn'), async () => {
+      clearMsg('formMsg');
+      try {
+        const payload = formPayload();
+        const { warnings } = state.editing
+          ? await api(`/api/subscriptions?id=${state.editing.id}`, { method: 'PUT', body: payload })
+          : await api('/api/subscriptions', { method: 'POST', body: payload });
+        $('formDlg').close();
+        await loadList();
+        if (warnings && warnings.length) showMsg('listMsg', 'warn', 'Guardada con advertencias:', warnings);
+        else showMsg('listMsg', 'ok', 'Suscripción guardada.');
+      } catch (error) {
+        errorMsg('formMsg', error);
+        $('formDlg').querySelector('.dlg-body').scrollTop = 0;
+      }
+    });
+  };
+
+  $('deleteBtn').onclick = () => {
+    if (!state.editing || !confirm(`¿Eliminar la suscripción "${state.editing.title}"? Para pausarla sin borrarla, desmarcá "Activa".`)) return;
+    busy($('deleteBtn'), async () => {
+      try {
+        await api(`/api/subscriptions?id=${state.editing.id}`, { method: 'DELETE' });
+        $('formDlg').close();
+        await loadList();
+        showMsg('listMsg', 'ok', 'Suscripción eliminada.');
+      } catch (error) {
+        errorMsg('formMsg', error);
+      }
+    });
+  };
+
+  $('previewBtn').onclick = () => busy($('previewBtn'), async () => {
+    clearMsg('formMsg');
+    try {
+      const { subject, html, itemCount, warnings } = await api('/api/subscriptions?action=preview', { method: 'POST', body: formPayload() });
+      $('previewTitle').textContent = `Vista previa · ${subject}`;
+      $('previewFrame').srcdoc = html;
+      if (warnings.length) showMsg('previewMsg', 'warn', `${itemCount} tickets. Advertencias:`, warnings);
+      else showMsg('previewMsg', 'ok', `${itemCount} tickets. No se envió ningún correo.`);
+      $('previewDlg').showModal();
+    } catch (error) {
+      errorMsg('formMsg', error);
+    }
+  });
+
+  $('testBtn').onclick = () => busy($('testBtn'), async () => {
+    clearMsg('formMsg');
+    try {
+      const { sentTo } = await api('/api/subscriptions?action=test', { method: 'POST', body: formPayload() });
+      showMsg('formMsg', 'ok', `Prueba enviada solo a ${sentTo}.`);
+    } catch (error) {
+      errorMsg('formMsg', error);
+    }
+  });
+
+  // ---- Historial ----
+  const KIND = { scheduled: 'Programado', test: 'Prueba' };
+  const RESULT = { ok: '<span class="pill ok">OK</span>', error: '<span class="pill error">Error</span>', skipped: '<span class="pill skipped">Omitido</span>' };
+  const ACTION = { create: 'Creó', update: 'Modificó', delete: 'Eliminó' };
+
+  async function openHistory(subscription) {
+    $('historyTitle').textContent = `Historial · ${subscription.title}`;
+    $('historyBody').innerHTML = $('auditBody').innerHTML = '<tr><td colspan="6" class="muted">Cargando…</td></tr>';
+    $('historyDlg').showModal();
+    try {
+      const { history, audit } = await api(`/api/subscriptions?id=${subscription.id}&view=history`);
+      $('historyBody').innerHTML = history.length ? history.map((h) => `<tr>
+        <td>${fmtDateTime(h.sentAt)}</td>
+        <td>${KIND[h.kind] || esc(h.kind)}${h.kind === 'test' ? `<div class="muted">${esc(h.triggeredBy)}</div>` : ''}</td>
+        <td>${h.ticketCount ?? '—'}</td>
+        <td>${h.recipients.map(esc).join('<br>')}</td>
+        <td>${RESULT[h.result] || esc(h.result)}</td>
+        <td class="muted">${esc(h.error)}${h.warnings.length ? `<div>⚠ ${h.warnings.map(esc).join('<br>⚠ ')}</div>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="muted">Sin envíos todavía.</td></tr>';
+      $('auditBody').innerHTML = audit.length ? audit.map((a) => `<tr>
+        <td>${fmtDateTime(a.at)}</td><td>${esc(a.actor)}</td><td>${ACTION[a.action] || esc(a.action)}</td>
+        <td class="muted">${esc(Object.keys(a.changes).join(', '))}</td>
+      </tr>`).join('') : '<tr><td colspan="4" class="muted">Sin registros.</td></tr>';
+    } catch (error) {
+      $('historyBody').innerHTML = `<tr><td colspan="6">${esc(error.message)}</td></tr>`;
+      $('auditBody').innerHTML = '';
+    }
+  }
+
+  initAuth().catch((error) => { showLogin(); showMsg('loginMsg', 'err', error.message); });
+})();
+</script>
+</body>
+</html>
