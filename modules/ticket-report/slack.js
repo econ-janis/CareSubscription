@@ -31,11 +31,9 @@ function buildSlackComment(snapshot, context) {
   const { report } = snapshot;
   const header = [
     `📣 *Preaviso: ${slackEscape(snapshot.title)}*`,
-    [
-      `Organization: ${slackEscape(context.organizationName)}`,
-      `Corte: ${slackEscape(snapshot.cutoffDate)}`,
-      context.nextSendLabel ? `Próximo envío a Consulting: *${slackEscape(context.nextSendLabel)}*` : 'Sin envío programado',
-    ].join('  ·  '),
+    context.nextSendLabel
+      ? `Foco con estos tickets para avanzarlos, el reporte se envía el ${slackEscape(context.nextSendLabel)}`
+      : 'Foco con estos tickets para avanzarlos.',
   ];
 
   const open = report.openTickets;
