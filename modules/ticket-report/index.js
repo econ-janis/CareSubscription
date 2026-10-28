@@ -95,7 +95,7 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
     { cid: 'footer@caresubscription', name: 'janis-commerce.png', buffer: JANIS_LOGO, contentType: 'image/png' },
   ];
   if (report.total > 0) {
-    images.push({ cid: 'chart@caresubscription', name: 'distribucion.png', buffer: renderDonutPng(report.segments, report.total, tx.tickets), contentType: 'image/png' });
+    images.push({ cid: 'chart@caresubscription', name: 'distribucion.png', buffer: renderDonutPng(report.segments, report.total, tx.donutCenter), contentType: 'image/png' });
   }
 
   const src = (cid) => {

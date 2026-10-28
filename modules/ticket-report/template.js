@@ -36,13 +36,11 @@ function cardTitle(text) {
 }
 
 function distributionCard(report, images, tx) {
-  const legend = report.segments.map((s) => `<tr>
-<td style="padding:2px 6px 2px 0;width:14px;">${dot(s.color)}</td>
-<td style="padding:2px 0;font-family:${FONT};font-size:12px;color:${C.muted};">${esc(s.label)} (${s.total})</td></tr>`).join('');
+  const legend = report.segments.map((s) => `<span style="display:inline-block;margin:2px 7px;font-family:${FONT};font-size:12px;color:${C.text};white-space:nowrap;">${dot(s.color)}&nbsp;${esc(s.label)}</span>`).join(' ');
 
   return card(`${cardTitle(tx.distribution)}
 <div style="text-align:center;"><img src="${esc(images.chart)}" width="220" height="220" alt="${esc(tx.chartAlt(report.total))}" style="display:block;margin:0 auto;width:220px;max-width:100%;height:auto;border:0;"></div>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px auto 0;">${legend}</table>`);
+<div style="text-align:center;margin-top:10px;line-height:20px;">${legend}</div>`);
 }
 
 function detailCard(report, tx, language) {
@@ -51,13 +49,13 @@ function detailCard(report, tx, language) {
 
   const rows = report.rows.map((r) => `<tr>
 ${td(`${dot(r.color)}&nbsp;&nbsp;${esc(r.label)}`, 'left')}
-${td(String(r.total), 'right')}
+${td(`<strong>${r.total}</strong>`, 'right')}
 ${td(formatPercent(r.percent, language), 'right', `color:${C.muted};`)}</tr>`).join('');
 
   const totalRow = `<tr>
 ${td(`<strong>${esc(tx.total)}</strong>`, 'left', 'border-bottom:0;')}
 ${td(`<strong>${report.total}</strong>`, 'right', 'border-bottom:0;')}
-${td(`<strong>${formatPercent(report.total ? 100 : 0, language)}</strong>`, 'right', 'border-bottom:0;')}</tr>`;
+${td(report.total ? '100%' : formatPercent(0, language), 'right', 'border-bottom:0;')}</tr>`;
 
   return card(`${cardTitle(tx.detail)}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -77,7 +75,7 @@ function openTicketsCard(report, tx, browseUrl) {
 <td style="padding:8px 4px;border-bottom:1px solid ${C.border};font-family:${FONT};font-size:12px;color:${C.text};vertical-align:top;">${esc(ticket.summary)}</td>
 <td style="padding:8px 4px;border-bottom:1px solid ${C.border};vertical-align:top;">${pill(ticket.status.label, ticket.status.color, ticket.status.textColor)}</td></tr>`).join('');
 
-  return card(`${cardTitle(`${tx.openTickets} (${report.openTickets.length})`)}
+  return card(`${cardTitle(tx.openTickets)}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr>${th(tx.key)}${th(tx.summary)}${th(tx.status)}</tr>
 ${rows}</table>`);
@@ -86,14 +84,14 @@ ${rows}</table>`);
 function renderReportHtml({ title, cutoffDate, language = 'es', report, images, browseUrl }) {
   const tx = t(language);
 
-  const column = (html) => `<div class="cs-col" style="display:inline-block;width:100%;max-width:316px;vertical-align:top;margin:0 0 8px;">${html}</div>`;
+  const column = (html, width) => `<div class="cs-col" style="display:inline-block;width:100%;max-width:${width}px;vertical-align:top;margin:0 0 8px;">${html}</div>`;
 
   // Sin tickets: un solo mensaje en lugar de las tarjetas.
   const rows = report.total === 0
     ? `<tr><td>${card(`<div style="font-family:${FONT};font-size:14px;color:${C.muted};text-align:center;padding:24px 0;">${esc(tx.noTickets)}</div>`)}</td></tr>`
     : `<tr><td align="center" style="font-size:0;line-height:0;">
-<!--[if mso]><table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td width="316" valign="top"><![endif]-->
-${column(distributionCard(report, images, tx))}<!--[if mso]></td><td width="8"></td><td width="316" valign="top"><![endif]--><div class="cs-gap" style="display:inline-block;width:8px;"></div>${column(detailCard(report, tx, language))}
+<!--[if mso]><table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td width="268" valign="top"><![endif]-->
+${column(distributionCard(report, images, tx), 268)}<!--[if mso]></td><td width="8"></td><td width="364" valign="top"><![endif]--><div class="cs-gap" style="display:inline-block;width:8px;"></div>${column(detailCard(report, tx, language), 364)}
 <!--[if mso]></td></tr></table><![endif]-->
 </td></tr>
 <tr><td style="padding-top:8px;">${openTicketsCard(report, tx, browseUrl)}</td></tr>`;
@@ -120,13 +118,13 @@ ${column(distributionCard(report, images, tx))}<!--[if mso]></td><td width="8"><
 <tr><td style="padding:0 0 16px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="vertical-align:middle;padding-right:12px;"><img src="${esc(images.logo)}" height="30" alt="" style="display:block;height:30px;width:auto;border:0;"></td>
-    <td style="vertical-align:middle;font-family:${FONT};font-size:20px;font-weight:700;color:${C.text};line-height:26px;">${esc(title)}</td>
+    <td style="vertical-align:middle;font-family:${FONT};font-size:22px;font-weight:700;color:${C.text};line-height:28px;">${esc(title)}</td>
   </tr></table>
   <div style="font-family:${FONT};font-size:12px;color:${C.muted};margin-top:6px;">${esc(tx.subtitle(cutoffDate))}</div>
 </td></tr>
 ${rows}
 <tr><td align="center" style="padding:24px 0 0;">
-  <div style="border-top:1px solid ${C.border};padding-top:20px;"><img src="${esc(images.footer)}" width="160" alt="Janis Commerce" style="display:block;margin:0 auto;width:160px;height:auto;border:0;"></div>
+  <div style="border-top:1px solid ${C.border};padding-top:28px;"><img src="${esc(images.footer)}" width="137" height="32" alt="Janis Commerce" style="display:block;margin:0 auto;width:137px;height:32px;border:0;"></div>
 </td></tr>
 </table>
 </td></tr>

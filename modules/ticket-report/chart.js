@@ -12,7 +12,7 @@ const DISPLAY_SIZE = 220;
 const SCALE = 2;
 const OUTER_R = 100;
 const INNER_R = 62;
-const MIN_LABEL_ANGLE = 0.22; // ~12.6°: segmentos más chicos no llevan número
+const MIN_LABEL_ANGLE = 0.15; // ~8.6°: segmentos más chicos no llevan número (no entra)
 
 function escapeXml(value) {
   return String(value).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c]));

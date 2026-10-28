@@ -29,7 +29,7 @@ test('sin tickets: mensaje de período vacío y sin gráfico', () => {
 test('sin tickets abiertos: "Sin tickets abiertos"', () => {
   const html = render([{ key: 'JCS-1', fields: { summary: 'x', status: { name: 'Done' }, created: '2026-01-01' } }]);
   assert.ok(html.includes('Sin tickets abiertos'));
-  assert.ok(html.includes('100,0%'));
+  assert.ok(html.includes('>100%<'));
 });
 
 test('portugués', () => {

@@ -11,7 +11,7 @@ const TEXTS = {
     summary: 'Resumen',
     noTickets: 'No hay tickets en el período.',
     noOpenTickets: 'Sin tickets abiertos',
-    tickets: 'tickets',
+    donutCenter: 'Total',
     chartAlt: (total) => `Gráfico de distribución por estado: ${total} tickets`,
   },
   pt: {
@@ -26,7 +26,7 @@ const TEXTS = {
     summary: 'Resumo',
     noTickets: 'Não há tickets no período.',
     noOpenTickets: 'Sem tickets abertos',
-    tickets: 'tickets',
+    donutCenter: 'Total',
     chartAlt: (total) => `Gráfico de distribuição por status: ${total} tickets`,
   },
 };
