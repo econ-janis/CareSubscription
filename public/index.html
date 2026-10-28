@@ -20,7 +20,9 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: Montserrat, system-ui, sans-serif; font-size: 14px; }
   header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
-  header img { height: 30px; }
+  header img { height: 32px; width: auto; }
+  .title-cell { display: flex; align-items: center; gap: 12px; }
+  .org-logo { width: 40px; height: 40px; flex: 0 0 40px; object-fit: contain; border-radius: 10px; border: 1px solid var(--border); background: #fff; padding: 4px; }
   header h1 { font-size: 16px; font-weight: 700; margin: 0; flex: 1; }
   header .user { color: var(--muted); font-size: 13px; }
   main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
@@ -82,7 +84,7 @@
 </head>
 <body>
 <header>
-  <img id="logo" src="/brand/logo-light.svg" alt="Janis Commerce">
+  <img id="logo" src="/brand/iso-color.svg" alt="Janis Commerce">
   <h1>CareSubscription</h1>
   <span class="user" id="userEmail"></span>
   <button class="icon-btn" id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
@@ -225,7 +227,7 @@
   // ---- Tema claro/oscuro (manual de marca) ----
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
-    $('logo').src = theme === 'dark' ? '/brand/logo-dark.svg' : '/brand/logo-light.svg';
+    $('logo').src = theme === 'dark' ? '/brand/iso-white.svg' : '/brand/iso-color.svg';
     $('favicon').href = theme === 'dark' ? '/brand/iso-white.svg' : '/brand/iso-color.svg';
     $('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
   }
@@ -326,6 +328,14 @@
     return `${days} · ${schedule.time}<div class="muted">${esc(schedule.timezone)}</div>`;
   }
 
+  // Logo de la Organization (Logo URL de la suscripción); si no hay o no
+  // carga, el isotipo de Janis, igual que en el correo.
+  const FALLBACK_LOGO = '/brand/iso-color.svg';
+  function orgLogo(s) {
+    const url = /^https:\/\//i.test(s.config.logoUrl || '') ? s.config.logoUrl : FALLBACK_LOGO;
+    return `<img class="org-logo" src="${esc(url)}" alt="${esc(s.organization.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${FALLBACK_LOGO}'">`;
+  }
+
   function statusPill(s) {
     if (!s.active) return '<span class="pill off">Pausada</span>';
     if (s.status === 'error') return `<span class="pill error" title="${esc(s.lastError)}">Error</span>`;
@@ -351,7 +361,7 @@
       return;
     }
     body.innerHTML = state.subscriptions.map((s) => `<tr>
-      <td><strong>${esc(s.title)}</strong>${s.status === 'error' ? `<div class="muted" style="color:var(--danger)">${esc(s.lastError)}</div>` : ''}</td>
+      <td><div class="title-cell">${orgLogo(s)}<div><strong>${esc(s.title)}</strong>${s.status === 'error' ? `<div class="muted" style="color:var(--danger)">${esc(s.lastError)}</div>` : ''}</div></div></td>
       <td>${esc(s.organization.name)}</td>
       <td>${scheduleText(s.schedule)}</td>
       <td>${s.recipients.length}</td>
