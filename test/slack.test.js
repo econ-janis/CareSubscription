@@ -14,7 +14,7 @@ function mockFetch(handler) {
   return { calls, restore: () => { global.fetch = original; } };
 }
 
-const ctx = { organizationName: 'Demo', nextSendLabel: 'mié 04/11, 09:00 (America/Santiago)', actor: 'ana@janiscommerce.com', browseUrl: (k) => `https://j.test/browse/${k}` };
+const ctx = { organizationName: 'Demo', nextSendLabel: 'lun 02-11, 10:00 a. m.', actor: 'ana@janiscommerce.com', browseUrl: (k) => `https://j.test/browse/${k}` };
 const ticket = (key, assignee, status = 'Revisión', summary = `Resumen ${key}`) => ({ key, summary, assignee, status: { label: status } });
 
 test('canal por defecto: #care-test (configurable con SLACK_CHANNEL)', () => {
@@ -63,7 +63,9 @@ test('mensaje: próximo envío, grupos con cantidad, links a Jira y escape de mr
   const snapshot = { title: 'Care <Weekly> & Co', cutoffDate: '28 oct 2026', report: { total: 5, openTickets: [ticket('JCS-1', 'Ana <QA>', 'Por Hacer', 'Falla <b> & más'), ticket('JCS-2', '', 'En Progreso')] } };
   const text = buildSlackComment(snapshot, ctx);
   assert.ok(text.includes('*Preaviso: Care &lt;Weekly&gt; &amp; Co*'));
-  assert.ok(text.includes('Próximo envío a Consulting: *mié 04/11, 09:00 (America/Santiago)*'));
+  assert.ok(text.includes('\nFoco con estos tickets para avanzarlos, el reporte se envía el lun 02-11, 10:00 a. m.\n'));
+  assert.ok(!text.includes('Organization:'));
+  assert.ok(!text.includes('Corte:'));
   assert.ok(text.includes('*Tickets abiertos (2)*'));
   assert.ok(text.includes('👤 *Ana &lt;QA&gt;* (1)\n• <https://j.test/browse/JCS-1|JCS-1> Falla &lt;b&gt; &amp; más — _Por Hacer_'));
   assert.ok(text.indexOf('👤 *Ana') < text.indexOf('👤 *Sin asignar* (1)'));
@@ -75,7 +77,7 @@ test('mensaje: próximo envío, grupos con cantidad, links a Jira y escape de mr
 test('mensaje: sin tickets abiertos, sin envío programado y recorte de mensajes largos', () => {
   const none = buildSlackComment({ title: 'T', cutoffDate: 'x', report: { total: 2, openTickets: [] } }, { ...ctx, nextSendLabel: '' });
   assert.ok(none.includes('Sin tickets abiertos'));
-  assert.ok(none.includes('Sin envío programado'));
+  assert.ok(none.includes('Foco con estos tickets para avanzarlos.'));
 
   const many = Array.from({ length: 120 }, (_, i) => ticket(`JCS-${i}`, `Persona ${String(i % 12).padStart(2, '0')}`, 'Revisión', 'Un resumen bastante largo para llenar el mensaje de Slack'));
   const text = buildSlackComment({ title: 'T', cutoffDate: 'x', report: { total: 120, openTickets: many } }, ctx);
