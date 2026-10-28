@@ -28,7 +28,7 @@ modules/
   index.js                 registro de módulos
   ticket-report/           JQL, normalización de estados, agregación, dona PNG, plantilla, textos es/pt
 config/statuses.json       tabla de estados (alias de Jira, colores, orden, abiertos)
-assets/                    logos de Janis en PNG y Montserrat (OFL) para el gráfico
+assets/                    logos de Janis en PNG (claro/oscuro) e Inter (OFL) para el gráfico
 .github/workflows/dispatch.yml  cron horario que llama a /api/dispatch
 ```
 
@@ -38,8 +38,10 @@ Stack: Node.js 20+, Vercel (funciones + estáticos) y Neon Postgres, igual que J
 
 Los clientes de correo no ejecutan JS y muchos no muestran SVG, así que todo se arma en el servidor:
 
-- HTML con tablas y estilos inline (Gmail y Outlook), ancho máximo 640 px. En pantallas angostas la dona y la tabla de detalle pasan a una sola columna (columnas *inline-block* + tabla condicional para Outlook).
-- Dona en **PNG** (SVG rasterizado con `@resvg/resvg-js` y Montserrat embebida), incrustada por **CID**. El logo del cliente y el de Janis también van por CID. Ninguna imagen queda en una URL pública.
+- El diseño replica el boceto aprobado (`care-weekly-status-carrefour-ar.html`): mismas medidas, colores, tipografía del sistema, bordes de 10 px y formato de números ("13.8%", "100%"). La comparación por captura contra el boceto, con los mismos datos, da diferencias de menos del 1,5 % de los píxeles (anti-aliasing) en escritorio, celular y modo oscuro.
+- HTML con tablas y estilos inline (Gmail y Outlook), ancho fluido hasta 1180 px. La columna de la dona mide 360 px y el detalle ocupa el resto. Por debajo de 820 px pasan a una sola columna y las tablas que no entran se desplazan horizontalmente dentro de su tarjeta.
+- Modo oscuro con `prefers-color-scheme`, igual que el boceto, con dona y logo del footer en versión oscura (Apple Mail, Outlook app, etc.; Gmail muestra siempre el claro).
+- Dona en **PNG** con la geometría del boceto (SVG rasterizado con `@resvg/resvg-js` e Inter embebida), incrustada por **CID**. El logo del cliente y el de Janis también van por CID. Ninguna imagen queda en una URL pública.
 - La vista previa de la UI usa la misma plantilla con las imágenes como `data:` URI y no envía nada.
 - Los destinatarios van en **CCO**, así ningún destinatario ve las direcciones de los demás (pueden ser de áreas o empresas distintas).
 

@@ -6,7 +6,7 @@ const { renderReportHtml } = require('../modules/ticket-report/template');
 const { renderDonutPng } = require('../modules/ticket-report/chart');
 
 const config = loadStatusConfig();
-const images = { logo: 'cid:logo', footer: 'cid:footer', chart: 'cid:chart' };
+const images = { logo: 'cid:logo', footer: 'cid:footer', footerDark: 'cid:footer-dark', chart: 'cid:chart', chartDark: 'cid:chart-dark' };
 const browseUrl = (key) => `https://janiscommerce.atlassian.net/browse/${key}`;
 const render = (issues, language = 'es') => renderReportHtml({ title: 'Reporte <Demo>', cutoffDate: '28/10/2026', language, report: aggregate(issues, config, language), images, browseUrl });
 
@@ -37,8 +37,23 @@ test('portugués', () => {
   assert.ok(html.includes('Não há tickets no período.'));
 });
 
+test('porcentajes con un decimal y fila Total en 100%', () => {
+  const html = render([
+    { key: 'JCS-1', fields: { summary: 'x', status: { name: 'Done' }, created: '2026-01-01' } },
+    { key: 'JCS-2', fields: { summary: 'y', status: { name: 'Done' }, created: '2026-01-01' } },
+    { key: 'JCS-3', fields: { summary: 'z', status: { name: 'To Do' }, created: '2026-01-01' } },
+  ]);
+  assert.ok(html.includes('>33.3%<'));
+  assert.ok(html.includes('>66.7%<'));
+  assert.ok(html.includes('>0.0%<'));
+  assert.ok(html.includes('>100%<'));
+  assert.ok(html.includes('cid:chart-dark'));
+});
+
 test('el gráfico se genera como PNG', () => {
-  const png = renderDonutPng([{ total: 3, color: '#FF3200', textColor: '#FFFFFF' }, { total: 1, color: '#2979FF', textColor: '#FFFFFF' }], 4, 'tickets');
-  assert.equal(png.subarray(1, 4).toString(), 'PNG');
-  assert.ok(png.length > 1000);
+  for (const theme of ['light', 'dark']) {
+    const png = renderDonutPng([{ total: 3, color: '#FF3200' }, { total: 1, color: '#2979FF' }], 4, 'Total', theme);
+    assert.equal(png.subarray(1, 4).toString(), 'PNG');
+    assert.ok(png.length > 1000);
+  }
 });

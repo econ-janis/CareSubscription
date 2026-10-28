@@ -17,6 +17,7 @@ const { t } = require('./i18n');
 const BRAND_DIR = path.join(__dirname, '..', '..', 'assets', 'brand');
 const JANIS_ISO = fs.readFileSync(path.join(BRAND_DIR, 'janis-iso.png'));
 const JANIS_LOGO = fs.readFileSync(path.join(BRAND_DIR, 'janis-logo.png'));
+const JANIS_LOGO_DARK = fs.readFileSync(path.join(BRAND_DIR, 'janis-logo-dark.png'));
 const FIELDS = ['summary', 'status', 'created'];
 
 function defaultConfig() {
@@ -93,9 +94,13 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   const images = [
     { cid: 'logo@caresubscription', name: 'logo', ...logo },
     { cid: 'footer@caresubscription', name: 'janis-commerce.png', buffer: JANIS_LOGO, contentType: 'image/png' },
+    { cid: 'footer-dark@caresubscription', name: 'janis-commerce-dark.png', buffer: JANIS_LOGO_DARK, contentType: 'image/png' },
   ];
   if (report.total > 0) {
-    images.push({ cid: 'chart@caresubscription', name: 'distribucion.png', buffer: renderDonutPng(report.segments, report.total, tx.donutCenter), contentType: 'image/png' });
+    images.push(
+      { cid: 'chart@caresubscription', name: 'distribucion.png', buffer: renderDonutPng(report.segments, report.total, tx.donutCenter, 'light'), contentType: 'image/png' },
+      { cid: 'chart-dark@caresubscription', name: 'distribucion-oscuro.png', buffer: renderDonutPng(report.segments, report.total, tx.donutCenter, 'dark'), contentType: 'image/png' },
+    );
   }
 
   const src = (cid) => {
@@ -110,7 +115,13 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
     language,
     report,
     browseUrl,
-    images: { logo: src('logo@caresubscription'), footer: src('footer@caresubscription'), chart: src('chart@caresubscription') },
+    images: {
+      logo: src('logo@caresubscription'),
+      footer: src('footer@caresubscription'),
+      footerDark: src('footer-dark@caresubscription'),
+      chart: src('chart@caresubscription'),
+      chartDark: src('chart-dark@caresubscription'),
+    },
   });
 
   const text = [
