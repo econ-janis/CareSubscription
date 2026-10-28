@@ -87,7 +87,7 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   });
 
   const cutoffDate = formatDate(now, subscription.schedule.timezone, language);
-  const subject = subscription.subject || `${subscription.title} · ${cutoffDate}`;
+  const subject = subscription.subject || subscription.title;
   const tx = t(language);
 
   const logo = await resolveLogo(subscription.config.logoUrl, warnings);
