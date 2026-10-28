@@ -15,7 +15,6 @@
     },
     "api/subscriptions.js": {
       "maxDuration": 60,
-      "memory": 2048,
       "includeFiles": "{assets,config}/**"
     }
   },

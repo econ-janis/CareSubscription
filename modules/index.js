@@ -4,8 +4,7 @@
 //   validateConfig(input, { organization, checkRemote }) -> { config, errors, warnings }
 //   build(subscription, { now, mode })    -> { subject, html, text, attachments, snapshot, itemCount, empty, skipIfEmpty, warnings }
 //   renderSnapshot(snapshot)              -> { subject, html, warnings }: vista de un envío del historial
-//   slackComment(snapshot, context)       -> texto mrkdwn del preaviso en Slack (opcional; va
-//                                            con la imagen de renderSnapshot)
+//   slackComment(snapshot, context)       -> texto mrkdwn del preaviso en Slack (opcional)
 // Programación, envío, historial, auditoría y control de destinatarios son
 // comunes (lib/) y no dependen del módulo.
 const ticketReport = require('./ticket-report');

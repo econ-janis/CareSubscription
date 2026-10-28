@@ -53,3 +53,11 @@ test('sin tickets: porcentajes en 0', () => {
   assert.ok(report.rows.every((r) => r.percent === 0));
   assert.equal(report.segments.length, 0);
 });
+
+test('tickets abiertos incluyen el responsable (assignee) de Jira', () => {
+  const report = aggregate([
+    { key: 'A-1', fields: { summary: 's', status: { name: 'To Do' }, created: '2026-01-01', assignee: { displayName: 'Ana Pérez' } } },
+    { key: 'A-2', fields: { summary: 's', status: { name: 'To Do' }, created: '2026-01-02', assignee: null } },
+  ], config, 'es');
+  assert.deepEqual(report.openTickets.map((t) => t.assignee), ['Ana Pérez', '']);
+});
