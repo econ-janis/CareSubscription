@@ -1,0 +1,16 @@
+{
+  "name": "caresubscription",
+  "private": true,
+  "description": "Notificaciones programadas de información de clientes de Janis Commerce a las áreas que corresponda. Primer módulo: reporte de tickets de JSM de los últimos 3 meses.",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "nodemailer": "^10.2.1"
+  }
+}
