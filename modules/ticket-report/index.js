@@ -19,7 +19,9 @@ const BRAND_DIR = path.join(__dirname, '..', '..', 'assets', 'brand');
 const JANIS_ISO = fs.readFileSync(path.join(BRAND_DIR, 'janis-iso.png'));
 const JANIS_LOGO = fs.readFileSync(path.join(BRAND_DIR, 'janis-logo.png'));
 const JANIS_LOGO_DARK = fs.readFileSync(path.join(BRAND_DIR, 'janis-logo-dark.png'));
-const FIELDS = ['summary', 'status', 'created'];
+// assignee: solo para agrupar por Responsable en el preaviso de Slack (el
+// correo no lo muestra).
+const FIELDS = ['summary', 'status', 'created', 'assignee'];
 
 function defaultConfig() {
   return { jql: DEFAULT_JQL, logoUrl: '', skipIfEmpty: false };
@@ -131,7 +133,7 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
 // Consulta Jira y arma el correo. Devuelve además el snapshot que se
 // guarda en el historial para poder ver después lo que se envió: solo lo
 // que muestra el correo (totales por estado y, de los tickets abiertos,
-// clave, resumen y estado).
+// clave, resumen, estado y responsable).
 async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   const warnings = [];
   const language = subscription.language || 'es';
@@ -156,7 +158,7 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
       total: report.total,
       rows: report.rows,
       segments: report.segments,
-      openTickets: report.openTickets.map(({ key, summary, status }) => ({ key, summary, status })),
+      openTickets: report.openTickets.map(({ key, summary, status, assignee }) => ({ key, summary, status, assignee })),
     },
   };
 
@@ -187,6 +189,6 @@ module.exports = {
   validateConfig,
   build,
   renderSnapshot,
-  // Comentario del preaviso en Slack (va junto a la imagen del reporte).
+  // Mensaje del preaviso en Slack (tickets abiertos por Responsable).
   slackComment: (snapshot, context) => buildSlackComment(snapshot, { ...context, browseUrl }),
 };

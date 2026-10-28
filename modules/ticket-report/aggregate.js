@@ -29,6 +29,7 @@ function aggregate(issues, statusConfig, language = 'es', { onUnknownStatus = ()
         key: issue.key,
         summary: fields.summary || '',
         created: fields.created || '',
+        assignee: fields.assignee ? fields.assignee.displayName || '' : '',
         status: { key: status.key, label: status.label[language] || status.label.es, color: status.color, textColor: status.textColor },
         order: status.order,
       });

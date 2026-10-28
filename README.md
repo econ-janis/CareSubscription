@@ -68,7 +68,7 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
 - **Destinatarios**: deben tener formato válido y un dominio de la lista permitida, que es `ALLOWED_RECIPIENT_DOMAINS` más los dominios del cliente cargados para esa Organization desde la UI. Se validan al guardar y otra vez en cada envío.
 - **Enviar prueba**: se envía solo a quien está configurando.
 - **Auditoría**: se registra quién creó, modificó o borró cada suscripción (y los dominios de cada Organization), cuándo y qué campos cambió.
-- **Datos**: el historial registra fecha, cantidad de tickets, destinatarios, resultado y error. Para poder ver cada correo enviado ("Ver correo"), guarda además una copia mínima de lo que muestra el correo: totales por estado y, de los tickets abiertos, clave, resumen y estado. Esa copia se borra sola a los 90 días; la fila del historial queda.
+- **Datos**: el historial registra fecha, cantidad de tickets, destinatarios, resultado y error. Para poder ver cada correo enviado ("Ver correo"), guarda además una copia mínima de lo que muestra el correo: totales por estado y, de los tickets abiertos, clave, resumen, estado y responsable. Esa copia se borra sola a los 90 días; la fila del historial queda.
 - **Logo URL**: debe ser HTTPS, `image/png` o `image/jpeg` (se verifica el content-type y la firma de bytes) y pesar como máximo 500 KB. Los hosts que resuelven a IPs privadas se rechazan y las redirecciones se validan.
 - **Secretos**: el token de Jira, SMTP, etc. van en variables de entorno del despliegue, nunca en el repo (ver `.env.example`). `/api/dispatch` sin `CRON_SECRET` queda cerrado.
 
@@ -87,16 +87,14 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
 
 ## Preaviso en Slack
 
-Cada suscripción tiene el botón **💬 Avisar en #canal**. Publica en Slack una **imagen del reporte**, igual a la vista del correo, junto con un comentario: próximo envío a Consulting y tickets abiertos con link a Jira. Sirve para que Customer Care se ponga al día antes del envío a Consulting.
+Cada suscripción tiene el botón **💬 Avisar en #canal**. Publica en Slack un mensaje con el próximo envío a Consulting y los **tickets abiertos agrupados por Responsable** (asignado en Jira; "Sin asignar" al final), con link a Jira. Sirve para que Customer Care se ponga al día antes del envío a Consulting. El correo no muestra el responsable (spec §5.1): solo el preaviso.
 
-- **Imagen:** se genera con una captura del mismo HTML del correo, usando Chromium sin interfaz (`@sparticuz/chromium` + `puppeteer-core`, cargados con `import()` porque son ESM-only). Solo lo usa la función `api/subscriptions.js`, con 2 GB de memoria.
 - **Historial:** queda registrado como "Preaviso Slack", con su vista. No cuenta como último envío de correo.
 - **Configuración:**
-  - `SLACK_BOT_TOKEN`: bot con `chat:write` y `files:write`.
-  - `SLACK_CHANNEL`: por defecto `#care-test`. Si se pone un nombre en lugar del ID, el bot necesita también `channels:read`.
-  - Hay que invitar el bot al canal.
+  - `SLACK_BOT_TOKEN`: bot con `chat:write`, invitado al canal.
+  - `SLACK_CHANNEL`: nombre o ID del canal. Por defecto `#care-test`.
   - Para pasar a `#care-talks`, cambiar `SLACK_CHANNEL` y hacer Redeploy.
-- **Local:** `CHROME_PATH` permite usar otro Chromium.
+- **Mensajes largos:** si el mensaje supera unos 3.800 caracteres, se cortan los últimos grupos y se indica cuántos tickets quedaron afuera.
 
 ## Cómo sumar un módulo nuevo
 
