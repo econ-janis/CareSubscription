@@ -21,7 +21,6 @@
   body { margin: 0; background: var(--bg); color: var(--text); font-family: Montserrat, system-ui, sans-serif; font-size: 14px; }
   header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
   header img { height: 32px; width: auto; }
-  .title-cell { display: flex; align-items: center; gap: 12px; }
   .org-logo { width: 40px; height: 40px; flex: 0 0 40px; object-fit: contain; border-radius: 10px; border: 1px solid var(--border); background: #fff; padding: 4px; }
   header h1 { font-size: 16px; font-weight: 700; margin: 0; flex: 1; }
   header .user { color: var(--muted); font-size: 13px; }
@@ -120,7 +119,7 @@
     <div id="listMsg"></div>
     <div class="card table-wrap">
       <table class="list">
-        <thead><tr><th>Título</th><th>Organization</th><th>Frecuencia</th><th>Envíos</th><th>Destinatarios</th><th>Estado</th><th>Última modificación</th><th></th></tr></thead>
+        <thead><tr><th style="width:56px;"></th><th>Organization</th><th>Frecuencia</th><th>Envíos</th><th>Destinatarios</th><th>Estado</th><th>Última modificación</th><th></th></tr></thead>
         <tbody id="listBody"><tr><td colspan="8" class="muted">Cargando…</td></tr></tbody>
       </table>
     </div>
@@ -377,16 +376,16 @@
       return;
     }
     body.innerHTML = state.subscriptions.map((s) => `<tr>
-      <td><div class="title-cell">${orgLogo(s)}<div><strong>${esc(s.title)}</strong>${s.status === 'error' ? `<div class="muted" style="color:var(--danger)">${esc(s.lastError)}</div>` : ''}</div></div></td>
+      <td title="${esc(s.title)}">${orgLogo(s)}</td>
       <td>${esc(s.organization.name)}</td>
       <td>${scheduleText(s.schedule)}</td>
       <td style="white-space:nowrap;">${sendsText(s)}</td>
       <td>${s.recipients.length}</td>
-      <td>${statusPill(s)}</td>
+      <td>${statusPill(s)}${s.status === 'error' ? `<div class="muted" style="color:var(--danger);max-width:240px;">${esc(s.lastError)}</div>` : ''}</td>
       <td>${fmtDateTime(s.updatedAt)}<div class="muted">${esc(s.updatedBy)}</div></td>
       <td style="white-space:nowrap;">
         <button class="link" data-edit="${s.id}">Editar</button><button class="link" data-history="${s.id}">Historial</button>
-        <div><button class="slack-btn" data-slack="${s.id}" ${state.slackEnabled ? '' : 'disabled'} title="${state.slackEnabled ? `Preaviso a ${esc(state.slackChannel)} antes del envío a Consulting` : 'Slack todavía no está configurado (SLACK_BOT_TOKEN)'}">💬 Avisar en ${esc(state.slackChannel)}</button></div>
+        <div><button class="slack-btn" data-slack="${s.id}" ${state.slackEnabled ? '' : 'disabled'} title="${state.slackEnabled ? `Preaviso a ${esc(state.slackChannel)} antes del envío a Consulting` : 'Slack todavía no está configurado (SLACK_BOT_TOKEN)'}">💬 Avisar en Slack</button></div>
       </td>
     </tr>`).join('');
     body.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => openForm(state.subscriptions.find((s) => s.id === Number(b.dataset.edit))); });
