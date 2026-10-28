@@ -1,8 +1,21 @@
 {
   "outputDirectory": "public",
   "functions": {
-    "api/*.js": {
+    "api/auth.js": {
       "maxDuration": 60,
+      "includeFiles": "{assets,config}/**"
+    },
+    "api/organizations.js": {
+      "maxDuration": 60,
+      "includeFiles": "{assets,config}/**"
+    },
+    "api/dispatch.js": {
+      "maxDuration": 60,
+      "includeFiles": "{assets,config}/**"
+    },
+    "api/subscriptions.js": {
+      "maxDuration": 60,
+      "memory": 2048,
       "includeFiles": "{assets,config}/**"
     }
   },
@@ -10,9 +23,18 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "same-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "same-origin"
+        }
       ]
     }
   ]

@@ -85,6 +85,19 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
    - Cargar los secrets `DISPATCH_URL` (`https://<deploy>/api/dispatch`) y `CRON_SECRET` en GitHub, para el workflow horario.
 5. Tests: `npm install && npm test`.
 
+## Preaviso en Slack
+
+Cada suscripción tiene el botón **💬 Avisar en #canal**. Publica en Slack una **imagen del reporte**, igual a la vista del correo, junto con un comentario: próximo envío a Consulting y tickets abiertos con link a Jira. Sirve para que Customer Care se ponga al día antes del envío a Consulting.
+
+- **Imagen:** se genera con una captura del mismo HTML del correo, usando Chromium sin interfaz (`@sparticuz/chromium` + `puppeteer-core`, cargados con `import()` porque son ESM-only). Solo lo usa la función `api/subscriptions.js`, con 2 GB de memoria.
+- **Historial:** queda registrado como "Preaviso Slack", con su vista. No cuenta como último envío de correo.
+- **Configuración:**
+  - `SLACK_BOT_TOKEN`: bot con `chat:write` y `files:write`.
+  - `SLACK_CHANNEL`: por defecto `#care-test`. Si se pone un nombre en lugar del ID, el bot necesita también `channels:read`.
+  - Hay que invitar el bot al canal.
+  - Para pasar a `#care-talks`, cambiar `SLACK_CHANNEL` y hacer Redeploy.
+- **Local:** `CHROME_PATH` permite usar otro Chromium.
+
 ## Cómo sumar un módulo nuevo
 
 1. Crear `modules/<id>/index.js` que exporte `id`, `name`, `defaultConfig()`, `validateConfig(input, { organization, checkRemote })` y `build(subscription, { now, mode })`. `build` devuelve `{ subject, html, text, attachments, itemCount, empty, skipIfEmpty, warnings }`.
