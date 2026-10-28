@@ -68,7 +68,7 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
 - **Destinatarios**: deben tener formato válido y un dominio de la lista permitida, que es `ALLOWED_RECIPIENT_DOMAINS` más los dominios del cliente cargados para esa Organization desde la UI. Se validan al guardar y otra vez en cada envío.
 - **Enviar prueba**: se envía solo a quien está configurando.
 - **Auditoría**: se registra quién creó, modificó o borró cada suscripción (y los dominios de cada Organization), cuándo y qué campos cambió.
-- **Datos**: no se guarda contenido de tickets. El historial registra solo fecha, cantidad de tickets, destinatarios, resultado y error.
+- **Datos**: el historial registra fecha, cantidad de tickets, destinatarios, resultado y error. Para poder ver cada correo enviado ("Ver correo"), guarda además una copia mínima de lo que muestra el correo: totales por estado y, de los tickets abiertos, clave, resumen y estado. Esa copia se borra sola a los 90 días; la fila del historial queda.
 - **Logo URL**: debe ser HTTPS, `image/png` o `image/jpeg` (se verifica el content-type y la firma de bytes) y pesar como máximo 500 KB. Los hosts que resuelven a IPs privadas se rechazan y las redirecciones se validan.
 - **Secretos**: el token de Jira, SMTP, etc. van en variables de entorno del despliegue, nunca en el repo (ver `.env.example`). `/api/dispatch` sin `CRON_SECRET` queda cerrado.
 

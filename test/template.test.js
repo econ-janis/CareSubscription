@@ -57,3 +57,22 @@ test('el gráfico se genera como PNG', () => {
     assert.ok(png.length > 1000);
   }
 });
+
+test('renderSnapshot reconstruye el correo desde el snapshot guardado (JSON)', async () => {
+  const { renderSnapshot } = require('../modules/ticket-report');
+  const report = aggregate([
+    { key: 'JCS-9', fields: { summary: 'Abierto', status: { name: 'To Do' }, created: '2026-01-01' } },
+    { key: 'JCS-8', fields: { summary: 'Cerrado', status: { name: 'Done' }, created: '2026-01-01' } },
+  ], config, 'es');
+  const snapshot = JSON.parse(JSON.stringify({
+    title: 'Demo', subject: 'Demo', cutoffDate: '28 oct 2026', language: 'es', logoUrl: '',
+    report: { total: report.total, rows: report.rows, segments: report.segments, openTickets: report.openTickets.map(({ key, summary, status }) => ({ key, summary, status })) },
+  }));
+
+  const { subject, html } = await renderSnapshot(snapshot);
+  assert.equal(subject, 'Demo');
+  assert.ok(html.includes('JCS-9'));
+  assert.ok(!html.includes('JCS-8'));
+  assert.ok(html.includes('data:image/png;base64,'));
+  assert.ok(html.includes('Corte: 28 oct 2026'));
+});

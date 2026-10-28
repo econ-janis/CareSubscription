@@ -119,8 +119,8 @@
     <div id="listMsg"></div>
     <div class="card table-wrap">
       <table class="list">
-        <thead><tr><th>Título</th><th>Organization</th><th>Frecuencia</th><th>Destinatarios</th><th>Estado</th><th>Última modificación</th><th></th></tr></thead>
-        <tbody id="listBody"><tr><td colspan="7" class="muted">Cargando…</td></tr></tbody>
+        <thead><tr><th>Título</th><th>Organization</th><th>Frecuencia</th><th>Envíos</th><th>Destinatarios</th><th>Estado</th><th>Última modificación</th><th></th></tr></thead>
+        <tbody id="listBody"><tr><td colspan="8" class="muted">Cargando…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -210,8 +210,10 @@
 <dialog id="historyDlg">
   <div class="dlg-head"><h3 id="historyTitle">Historial</h3><button type="button" class="icon-btn" data-close>✕</button></div>
   <div class="dlg-body">
+    <div id="historyNext"></div>
     <h4>Envíos</h4>
-    <div class="table-wrap"><table class="list"><thead><tr><th>Fecha</th><th>Tipo</th><th>Tickets</th><th>Destinatarios</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+    <div class="table-wrap"><table class="list"><thead><tr><th>Fecha</th><th>Tipo</th><th>Tickets</th><th>Destinatarios</th><th>Correo</th><th>Vista</th><th>Detalle</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+    <div class="muted" id="historyRetention" style="margin-top:6px;"></div>
     <h4 style="margin-top:24px;">Auditoría</h4>
     <div class="table-wrap"><table class="list"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Campos</th></tr></thead><tbody id="auditBody"></tbody></table></div>
   </div>
@@ -336,6 +338,17 @@
     return `<img class="org-logo" src="${esc(url)}" alt="${esc(s.organization.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${FALLBACK_LOGO}'">`;
   }
 
+  // Fecha/hora en la zona horaria de la suscripción, ej. "mié 04/11, 09:00".
+  function fmtInTz(value, timezone) {
+    return new Date(value).toLocaleString('es-AR', { timeZone: timezone, weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function sendsText(s) {
+    const last = s.lastSentAt ? `✉ ${esc(fmtDateTime(s.lastSentAt))}` : '<span class="muted">Sin envíos</span>';
+    const next = s.nextSendAt ? `<div class="muted">Próximo: ${esc(fmtInTz(s.nextSendAt, s.schedule.timezone))}</div>` : '';
+    return last + next;
+  }
+
   function statusPill(s) {
     if (!s.active) return '<span class="pill off">Pausada</span>';
     if (s.status === 'error') return `<span class="pill error" title="${esc(s.lastError)}">Error</span>`;
@@ -357,13 +370,14 @@
   function renderList() {
     const body = $('listBody');
     if (!state.subscriptions.length) {
-      body.innerHTML = '<tr><td colspan="7" class="muted">Todavía no hay suscripciones.</td></tr>';
+      body.innerHTML = '<tr><td colspan="8" class="muted">Todavía no hay suscripciones.</td></tr>';
       return;
     }
     body.innerHTML = state.subscriptions.map((s) => `<tr>
       <td><div class="title-cell">${orgLogo(s)}<div><strong>${esc(s.title)}</strong>${s.status === 'error' ? `<div class="muted" style="color:var(--danger)">${esc(s.lastError)}</div>` : ''}</div></div></td>
       <td>${esc(s.organization.name)}</td>
       <td>${scheduleText(s.schedule)}</td>
+      <td style="white-space:nowrap;">${sendsText(s)}</td>
       <td>${s.recipients.length}</td>
       <td>${statusPill(s)}</td>
       <td>${fmtDateTime(s.updatedAt)}<div class="muted">${esc(s.updatedBy)}</div></td>
@@ -539,31 +553,59 @@
 
   // ---- Historial ----
   const KIND = { scheduled: 'Programado', test: 'Prueba' };
-  const RESULT = { ok: '<span class="pill ok">OK</span>', error: '<span class="pill error">Error</span>', skipped: '<span class="pill skipped">Omitido</span>' };
+  const RESULT = { ok: '<span class="pill ok">✉ Enviado</span>', error: '<span class="pill error">No enviado · error</span>', skipped: '<span class="pill skipped">No enviado · vacío</span>' };
   const ACTION = { create: 'Creó', update: 'Modificó', delete: 'Eliminó' };
 
   async function openHistory(subscription) {
     $('historyTitle').textContent = `Historial · ${subscription.title}`;
-    $('historyBody').innerHTML = $('auditBody').innerHTML = '<tr><td colspan="6" class="muted">Cargando…</td></tr>';
+    $('historyBody').innerHTML = '<tr><td colspan="7" class="muted">Cargando…</td></tr>';
+    $('auditBody').innerHTML = '';
+    clearMsg('historyNext');
+    $('historyRetention').textContent = '';
     $('historyDlg').showModal();
     try {
-      const { history, audit } = await api(`/api/subscriptions?id=${subscription.id}&view=history`);
+      const { history, audit, nextSendAt, snapshotRetentionDays } = await api(`/api/subscriptions?id=${subscription.id}&view=history`);
+      if (nextSendAt) {
+        showMsg('historyNext', 'ok', `Próximo envío programado: ${fmtInTz(nextSendAt, subscription.schedule.timezone)} (${subscription.schedule.timezone})`);
+      } else {
+        showMsg('historyNext', 'warn', subscription.active ? 'Sin envíos programados: el envío de correo no está configurado.' : 'Suscripción pausada: no hay envíos programados.');
+      }
+      $('historyRetention').textContent = `La vista de cada correo enviado se conserva ${snapshotRetentionDays} días.`;
+
       $('historyBody').innerHTML = history.length ? history.map((h) => `<tr>
-        <td>${fmtDateTime(h.sentAt)}</td>
+        <td style="white-space:nowrap;">${fmtDateTime(h.sentAt)}</td>
         <td>${KIND[h.kind] || esc(h.kind)}${h.kind === 'test' ? `<div class="muted">${esc(h.triggeredBy)}</div>` : ''}</td>
         <td>${h.ticketCount ?? '—'}</td>
         <td>${h.recipients.map(esc).join('<br>')}</td>
         <td>${RESULT[h.result] || esc(h.result)}</td>
+        <td>${h.hasSnapshot ? `<button class="link" data-sent="${h.id}" style="white-space:nowrap;">Ver correo</button>` : '<span class="muted">—</span>'}</td>
         <td class="muted">${esc(h.error)}${h.warnings.length ? `<div>⚠ ${h.warnings.map(esc).join('<br>⚠ ')}</div>` : ''}</td>
-      </tr>`).join('') : '<tr><td colspan="6" class="muted">Sin envíos todavía.</td></tr>';
+      </tr>`).join('') : '<tr><td colspan="7" class="muted">Sin envíos todavía.</td></tr>';
+      $('historyBody').querySelectorAll('[data-sent]').forEach((b) => { b.onclick = () => openSent(subscription, Number(b.dataset.sent), b); });
+
       $('auditBody').innerHTML = audit.length ? audit.map((a) => `<tr>
         <td>${fmtDateTime(a.at)}</td><td>${esc(a.actor)}</td><td>${ACTION[a.action] || esc(a.action)}</td>
-        <td class="muted">${esc(Object.keys(a.changes).join(', '))}</td>
+        <td class="muted">${esc(Object.keys(a.changes).join(', ') || 'sin cambios')}</td>
       </tr>`).join('') : '<tr><td colspan="4" class="muted">Sin registros.</td></tr>';
     } catch (error) {
-      $('historyBody').innerHTML = `<tr><td colspan="6">${esc(error.message)}</td></tr>`;
-      $('auditBody').innerHTML = '';
+      $('historyBody').innerHTML = `<tr><td colspan="7">${esc(error.message)}</td></tr>`;
     }
+  }
+
+  // Vista del correo tal como se envió (reconstruido desde el historial).
+  function openSent(subscription, historyId, button) {
+    busy(button, async () => {
+      try {
+        const { subject, html, sentAt, warnings } = await api(`/api/subscriptions?id=${subscription.id}&view=sent&historyId=${historyId}`);
+        $('previewTitle').textContent = `Enviado ${fmtDateTime(sentAt)} · ${subject}`;
+        $('previewFrame').srcdoc = html;
+        if (warnings.length) showMsg('previewMsg', 'warn', 'Advertencias:', warnings);
+        else showMsg('previewMsg', 'ok', `Copia del correo enviado el ${fmtDateTime(sentAt)}`);
+        $('previewDlg').showModal();
+      } catch (error) {
+        showMsg('historyNext', 'err', error.message);
+      }
+    });
   }
 
   initAuth().catch((error) => { showLogin(); showMsg('loginMsg', 'err', error.message); });
