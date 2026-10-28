@@ -25,7 +25,8 @@ function groupByAssignee(tickets) {
   });
 }
 
-// context: { organizationName, nextSendLabel, actor, browseUrl }
+// context: { organizationName, nextSendLabel, browseUrl }. Quién lo envió
+// queda en el historial, no en el mensaje.
 function buildSlackComment(snapshot, context) {
   const { report } = snapshot;
   const header = [
@@ -36,11 +37,10 @@ function buildSlackComment(snapshot, context) {
       context.nextSendLabel ? `Próximo envío a Consulting: *${slackEscape(context.nextSendLabel)}*` : 'Sin envío programado',
     ].join('  ·  '),
   ];
-  const footer = ['', `_Enviado desde CareSubscription por ${slackEscape(context.actor)}_`];
 
   const open = report.openTickets;
   if (!open.length) {
-    return [...header, '', report.total ? 'Sin tickets abiertos 🎉' : 'No hay tickets en el período.', ...footer].join('\n');
+    return [...header, '', report.total ? 'Sin tickets abiertos 🎉' : 'No hay tickets en el período.'].join('\n');
   }
 
   const body = ['', `*Tickets abiertos (${open.length})*`];
@@ -51,7 +51,7 @@ function buildSlackComment(snapshot, context) {
     for (const ticket of tickets) {
       block.push(`• <${context.browseUrl(ticket.key)}|${slackEscape(ticket.key)}> ${slackEscape(ticket.summary)} — _${slackEscape(ticket.status.label)}_`);
     }
-    if ([...header, ...body, ...block, ...footer].join('\n').length > MAX_CHARS) {
+    if ([...header, ...body, ...block].join('\n').length > MAX_CHARS) {
       truncated = true;
       break;
     }
@@ -60,7 +60,7 @@ function buildSlackComment(snapshot, context) {
   }
   if (truncated) body.push('', `_…y ${open.length - shown} tickets más (ver el reporte completo en CareSubscription)_`);
 
-  return [...header, ...body, ...footer].join('\n');
+  return [...header, ...body].join('\n');
 }
 
 module.exports = { buildSlackComment, groupByAssignee, slackEscape, UNASSIGNED };

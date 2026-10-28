@@ -67,7 +67,8 @@ test('mensaje: próximo envío, grupos con cantidad, links a Jira y escape de mr
   assert.ok(text.includes('*Tickets abiertos (2)*'));
   assert.ok(text.includes('👤 *Ana &lt;QA&gt;* (1)\n• <https://j.test/browse/JCS-1|JCS-1> Falla &lt;b&gt; &amp; más — _Por Hacer_'));
   assert.ok(text.indexOf('👤 *Ana') < text.indexOf('👤 *Sin asignar* (1)'));
-  assert.ok(text.includes('ana@janiscommerce.com'));
+  assert.ok(!text.includes('ana@janiscommerce.com'));
+  assert.ok(!text.includes('Enviado desde'));
   assert.equal(slackEscape('a<b>&c'), 'a&lt;b&gt;&amp;c');
 });
 
