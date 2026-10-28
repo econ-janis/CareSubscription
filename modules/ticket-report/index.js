@@ -3,7 +3,7 @@ const path = require('node:path');
 const { searchAll, validateJql, browseUrl } = require('../../lib/jira');
 const { fetchLogo } = require('../../lib/logo');
 const { formatDate } = require('../../lib/schedule');
-const { DEFAULT_JQL, resolveJql, hasPlaceholder } = require('./jql');
+const { DEFAULT_JQL, resolveJql, filtersByOrganization } = require('./jql');
 const { loadStatusConfig } = require('./statuses');
 const { aggregate } = require('./aggregate');
 const { renderDonutPng } = require('./chart');
@@ -38,8 +38,8 @@ async function validateConfig(input = {}, { organization, checkRemote = true } =
   if (!config.jql) {
     errors.push('El JQL es obligatorio');
   } else {
-    if (!hasPlaceholder(config.jql)) {
-      warnings.push('El JQL no contiene {organization}: el reporte no quedará filtrado por la Organization elegida');
+    if (!filtersByOrganization(config.jql)) {
+      warnings.push('El JQL no filtra por Organization: el reporte incluiría tickets de todos los clientes del proyecto');
     }
     if (checkRemote && organization) {
       const jiraError = await validateJql(resolveJql(config.jql, organization.name));

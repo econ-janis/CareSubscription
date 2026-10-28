@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveJql, hasPlaceholder, DEFAULT_JQL } = require('../modules/ticket-report/jql');
+const { resolveJql, hasPlaceholder, filtersByOrganization, DEFAULT_JQL } = require('../modules/ticket-report/jql');
 
 test('reemplaza {organization} por el nombre entre comillas', () => {
   assert.equal(resolveJql(DEFAULT_JQL, 'Cliente Demo'),
@@ -18,4 +18,18 @@ test('reemplaza todas las apariciones', () => {
 test('detecta si falta el comodín', () => {
   assert.equal(hasPlaceholder(DEFAULT_JQL), true);
   assert.equal(hasPlaceholder('project = JCS'), false);
+});
+
+test('detecta si el JQL filtra por Organization (campo de Jira o comodín)', () => {
+  assert.equal(filtersByOrganization(DEFAULT_JQL), true);
+  assert.equal(filtersByOrganization('project = JCS AND Organizations = "Carrefour - Argentina" ORDER BY created DESC'), true);
+  assert.equal(filtersByOrganization('project = JCS and organizations in ("A", "B")'), true);
+  assert.equal(filtersByOrganization('project = JCS AND ORGANIZATIONS ~ "Carrefour"'), true);
+  assert.equal(filtersByOrganization('project = JCS AND created >= startOfDay(-3M)'), false);
+  assert.equal(filtersByOrganization('project = JCS AND text ~ "organizations"'), false);
+});
+
+test('sin {organization} el JQL queda igual', () => {
+  const jql = 'project = JCS AND Organizations = "Carrefour - Argentina"';
+  assert.equal(resolveJql(jql, 'Otra Organization'), jql);
 });
