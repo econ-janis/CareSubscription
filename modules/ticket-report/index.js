@@ -9,6 +9,7 @@ const { aggregate } = require('./aggregate');
 const { renderDonutPng } = require('./chart');
 const { renderReportHtml } = require('./template');
 const { t } = require('./i18n');
+const { buildSlackComment } = require('./slack');
 
 // Módulo "Reporte de tickets de los últimos 3 meses" (spec §1-§8).
 // Contrato de módulo (ver modules/index.js): defaultConfig, validateConfig
@@ -186,4 +187,6 @@ module.exports = {
   validateConfig,
   build,
   renderSnapshot,
+  // Comentario del preaviso en Slack (va junto a la imagen del reporte).
+  slackComment: (snapshot, context) => buildSlackComment(snapshot, { ...context, browseUrl }),
 };

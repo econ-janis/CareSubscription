@@ -1,6 +1,7 @@
 const { requireUser } = require('../lib/auth');
 const { validateSubscriptionInput } = require('../lib/subscriptions');
-const { runSubscription } = require('../lib/runner');
+const { runSubscription, runSlackPreview } = require('../lib/runner');
+const { isSlackConfigured } = require('../lib/slack');
 const { getModule, listModules } = require('../modules');
 const { isMailConfigured } = require('../lib/mailer');
 const { nextSlot } = require('../lib/schedule');
@@ -16,6 +17,7 @@ const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 // DELETE /api/subscriptions?id=N            -> borrar
 // POST   /api/subscriptions?action=preview  -> render con datos reales, sin enviar
 // POST   /api/subscriptions?action=test     -> envía solo al usuario logueado
+// POST   /api/subscriptions?action=slack&id=N -> preaviso en Slack (SLACK_CHANNEL) de una suscripción guardada
 // (todo en un archivo para no sumar Serverless Functions al plan Hobby)
 const AUDITED_FIELDS = ['title', 'organization', 'config', 'recipients', 'subject', 'schedule', 'language', 'active'];
 
@@ -68,6 +70,16 @@ module.exports = async (req, res) => {
   try {
     const user = await requireUser(req);
     const { id, view, action, historyId } = req.query || {};
+
+    if (req.method === 'POST' && action === 'slack') {
+      if (!isSlackConfigured()) throw new HttpError(503, 'Slack todavía no está configurado (falta SLACK_BOT_TOKEN)');
+      const subscription = await db.getSubscription(parseId(id));
+      if (!subscription) throw new HttpError(404, 'Suscripción inexistente');
+      const outcome = await runSlackPreview(subscription, { triggeredBy: user.email });
+      if (outcome.result !== 'ok') throw new HttpError(502, `No se pudo enviar el preaviso: ${outcome.error}`);
+      sendJson(res, 200, { ok: true, channel: outcome.channel });
+      return;
+    }
 
     if (req.method === 'POST' && action) {
       await handleAction(String(action), req, res, user);

@@ -1,8 +1,9 @@
 const { verifyAccess, createSessionCookie, clearSessionCookie, getSessionUser, userDomain } = require('../lib/auth');
 const { isMailConfigured } = require('../lib/mailer');
+const { isSlackConfigured, slackChannel } = require('../lib/slack');
 const { sendJson, readBody, handleError } = require('../lib/http');
 
-// GET    /api/auth -> { user, userDomain, mailEnabled, accessConfigured }
+// GET    /api/auth -> { user, userDomain, mailEnabled, slackEnabled, slackChannel, accessConfigured }
 // POST   /api/auth { accessKey, email } -> login con la clave compartida
 // DELETE /api/auth -> logout
 module.exports = async (req, res) => {
@@ -10,7 +11,14 @@ module.exports = async (req, res) => {
     if (req.method === 'GET') {
       const accessConfigured = (process.env.ACCESS_KEY || '').length >= 16;
       const user = accessConfigured ? await getSessionUser(req) : null;
-      sendJson(res, 200, { user, userDomain: userDomain(), mailEnabled: isMailConfigured(), accessConfigured });
+      sendJson(res, 200, {
+        user,
+        userDomain: userDomain(),
+        mailEnabled: isMailConfigured(),
+        slackEnabled: isSlackConfigured(),
+        slackChannel: slackChannel(),
+        accessConfigured,
+      });
       return;
     }
 
