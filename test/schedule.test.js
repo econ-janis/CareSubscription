@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validateSchedule, zonedTimeToUtc, latestSlot, dueSlot, GRACE_MS } = require('../lib/schedule');
+const { validateSchedule, zonedTimeToUtc, latestSlot, nextSlot, dueSlot, GRACE_MS } = require('../lib/schedule');
 
 const santiago = { days: [1, 3], time: '09:00', timezone: 'America/Santiago' };
 
@@ -36,4 +36,11 @@ test('dueSlot respeta slot ya enviado, ventana de gracia y fecha de creación', 
 test('validateSchedule', () => {
   assert.deepEqual(validateSchedule({ days: [3, '1', 1, 9], time: '07:30' }).schedule, { days: [1, 3], time: '07:30', timezone: 'America/Santiago' });
   assert.equal(validateSchedule({ days: [], time: '25:00', timezone: 'Mars/Base' }).errors.length, 3);
+});
+
+test('próximo slot: mismo día si todavía no llegó la hora, si no el siguiente día programado', () => {
+  // miércoles 28/10 08:00 Santiago -> miércoles 09:00
+  assert.equal(nextSlot(santiago, new Date('2026-10-28T11:00:00Z')).toISOString(), '2026-10-28T12:00:00.000Z');
+  // miércoles 28/10 09:00 en punto -> lunes 02/11 09:00
+  assert.equal(nextSlot(santiago, new Date('2026-10-28T12:00:00Z')).toISOString(), '2026-11-02T12:00:00.000Z');
 });

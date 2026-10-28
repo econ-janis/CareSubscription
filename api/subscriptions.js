@@ -3,12 +3,14 @@ const { validateSubscriptionInput } = require('../lib/subscriptions');
 const { runSubscription } = require('../lib/runner');
 const { getModule, listModules } = require('../modules');
 const { isMailConfigured } = require('../lib/mailer');
+const { nextSlot } = require('../lib/schedule');
 const db = require('../lib/db');
 const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 
 // GET    /api/subscriptions                 -> lista + módulos disponibles
 // GET    /api/subscriptions?id=N            -> una suscripción
 // GET    /api/subscriptions?id=N&view=history -> historial de envíos + auditoría
+// GET    /api/subscriptions?id=N&view=sent&historyId=M -> vista del correo enviado
 // POST   /api/subscriptions                 -> crear
 // PUT    /api/subscriptions?id=N            -> modificar
 // DELETE /api/subscriptions?id=N            -> borrar
@@ -65,7 +67,7 @@ async function handleAction(action, req, res, user) {
 module.exports = async (req, res) => {
   try {
     const user = await requireUser(req);
-    const { id, view, action } = req.query || {};
+    const { id, view, action, historyId } = req.query || {};
 
     if (req.method === 'POST' && action) {
       await handleAction(String(action), req, res, user);
@@ -74,7 +76,13 @@ module.exports = async (req, res) => {
 
     if (req.method === 'GET') {
       if (!id) {
-        sendJson(res, 200, { subscriptions: await db.listSubscriptions(), modules: listModules() });
+        // Próximo envío: solo si la suscripción está activa y hay correo configurado.
+        const mailEnabled = isMailConfigured();
+        const subscriptions = (await db.listSubscriptions()).map((s) => ({
+          ...s,
+          nextSendAt: s.active && mailEnabled ? nextSlot(s.schedule) : null,
+        }));
+        sendJson(res, 200, { subscriptions, modules: listModules() });
         return;
       }
       const subscriptionId = parseId(id);
@@ -83,7 +91,22 @@ module.exports = async (req, res) => {
 
       if (view === 'history') {
         const [history, audit] = await Promise.all([db.listHistory(subscriptionId), db.listAudit('subscription', subscriptionId)]);
-        sendJson(res, 200, { history, audit });
+        const mailEnabled = isMailConfigured();
+        sendJson(res, 200, {
+          history,
+          audit,
+          nextSendAt: subscription.active && mailEnabled ? nextSlot(subscription.schedule) : null,
+          snapshotRetentionDays: db.SNAPSHOT_RETENTION_DAYS,
+        });
+        return;
+      }
+
+      if (view === 'sent') {
+        const found = await db.getHistorySnapshot(subscriptionId, parseId(historyId));
+        if (!found) throw new HttpError(404, `No hay copia de ese envío (se guardan ${db.SNAPSHOT_RETENTION_DAYS} días)`);
+        const module = getModule(subscription.module);
+        const { subject, html, warnings } = await module.renderSnapshot(found.snapshot);
+        sendJson(res, 200, { subject, html, sentAt: found.sentAt, warnings });
         return;
       }
       sendJson(res, 200, { subscription });

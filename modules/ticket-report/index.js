@@ -70,27 +70,15 @@ async function resolveLogo(logoUrl, warnings) {
   return { buffer: JANIS_ISO, contentType: 'image/png' };
 }
 
-// Construye el correo. mode: 'email' (imágenes por CID) o 'preview'
-// (imágenes como data: URI para mostrar en la UI, sin enviar nada).
-async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
-  const warnings = [];
-  const language = subscription.language || 'es';
-  const statusConfig = loadStatusConfig();
-  const jql = resolveJql(subscription.config.jql, subscription.organization.name);
-
-  const issues = await searchAll(jql, FIELDS);
-  const report = aggregate(issues, statusConfig, language, {
-    onUnknownStatus: (name) => {
-      console.warn(`[ticket-report] estado de Jira sin mapear en config/statuses.json: "${name}" (suscripción ${subscription.id ?? 'sin guardar'})`);
-      warnings.push(`Estado sin mapear: ${name}`);
-    },
-  });
-
-  const cutoffDate = formatDate(now, subscription.schedule.timezone, language);
-  const subject = subscription.subject || subscription.title;
+// Dibuja el correo a partir de un snapshot (los datos ya agregados, sin
+// consultar Jira). mode: 'email' (imágenes por CID) o 'preview' (imágenes
+// como data: URI para mostrar en la UI). Se usa al enviar, en la vista
+// previa y para reconstruir un envío del historial tal como salió.
+async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
+  const { title, cutoffDate, language, report } = snapshot;
   const tx = t(language);
 
-  const logo = await resolveLogo(subscription.config.logoUrl, warnings);
+  const logo = await resolveLogo(snapshot.logoUrl, warnings);
   const images = [
     { cid: 'logo@caresubscription', name: 'logo', ...logo },
     { cid: 'footer@caresubscription', name: 'janis-commerce.png', buffer: JANIS_LOGO, contentType: 'image/png' },
@@ -110,7 +98,7 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   };
 
   const html = renderReportHtml({
-    title: subscription.title,
+    title,
     cutoffDate,
     language,
     report,
@@ -125,7 +113,7 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   });
 
   const text = [
-    subscription.title,
+    title,
     tx.subtitle(cutoffDate),
     '',
     ...report.rows.map((r) => `${r.label}: ${r.total}`),
@@ -133,15 +121,62 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   ].join('\n');
 
   return {
-    subject,
     html,
     text,
     attachments: images.map((i) => ({ filename: i.name, content: i.buffer, contentType: i.contentType, cid: i.cid })),
+  };
+}
+
+// Consulta Jira y arma el correo. Devuelve además el snapshot que se
+// guarda en el historial para poder ver después lo que se envió: solo lo
+// que muestra el correo (totales por estado y, de los tickets abiertos,
+// clave, resumen y estado).
+async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
+  const warnings = [];
+  const language = subscription.language || 'es';
+  const statusConfig = loadStatusConfig();
+  const jql = resolveJql(subscription.config.jql, subscription.organization.name);
+
+  const issues = await searchAll(jql, FIELDS);
+  const report = aggregate(issues, statusConfig, language, {
+    onUnknownStatus: (name) => {
+      console.warn(`[ticket-report] estado de Jira sin mapear en config/statuses.json: "${name}" (suscripción ${subscription.id ?? 'sin guardar'})`);
+      warnings.push(`Estado sin mapear: ${name}`);
+    },
+  });
+
+  const snapshot = {
+    title: subscription.title,
+    subject: subscription.subject || subscription.title,
+    cutoffDate: formatDate(now, subscription.schedule.timezone, language),
+    language,
+    logoUrl: subscription.config.logoUrl || '',
+    report: {
+      total: report.total,
+      rows: report.rows,
+      segments: report.segments,
+      openTickets: report.openTickets.map(({ key, summary, status }) => ({ key, summary, status })),
+    },
+  };
+
+  const rendered = await render(snapshot, { mode, warnings });
+
+  return {
+    subject: snapshot.subject,
+    ...rendered,
+    snapshot,
     itemCount: report.total,
     empty: report.total === 0,
     skipIfEmpty: subscription.config.skipIfEmpty,
     warnings,
   };
+}
+
+// Vista de un envío del historial, reconstruida desde su snapshot.
+async function renderSnapshot(snapshot) {
+  const warnings = [];
+  const { html } = await render(snapshot, { mode: 'preview', warnings });
+  return { subject: snapshot.subject, html, warnings };
 }
 
 module.exports = {
@@ -150,4 +185,5 @@ module.exports = {
   defaultConfig,
   validateConfig,
   build,
+  renderSnapshot,
 };

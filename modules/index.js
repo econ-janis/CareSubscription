@@ -2,7 +2,8 @@
 //   id, name
 //   defaultConfig()                       -> config inicial para la UI
 //   validateConfig(input, { organization, checkRemote }) -> { config, errors, warnings }
-//   build(subscription, { now, mode })    -> { subject, html, text, attachments, itemCount, empty, skipIfEmpty, warnings }
+//   build(subscription, { now, mode })    -> { subject, html, text, attachments, snapshot, itemCount, empty, skipIfEmpty, warnings }
+//   renderSnapshot(snapshot)              -> { subject, html, warnings }: vista de un envío del historial
 // Programación, envío, historial, auditoría y control de destinatarios son
 // comunes (lib/) y no dependen del módulo.
 const ticketReport = require('./ticket-report');
