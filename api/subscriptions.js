@@ -2,6 +2,7 @@ const { requireUser } = require('../lib/auth');
 const { validateSubscriptionInput } = require('../lib/subscriptions');
 const { runSubscription, runSlackPreview } = require('../lib/runner');
 const { isSlackConfigured } = require('../lib/slack');
+const { validateRecipients } = require('../lib/recipients');
 const { getModule, listModules } = require('../modules');
 const { isMailConfigured } = require('../lib/mailer');
 const { nextSlot } = require('../lib/schedule');
@@ -16,7 +17,8 @@ const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 // PUT    /api/subscriptions?id=N            -> modificar
 // DELETE /api/subscriptions?id=N            -> borrar
 // POST   /api/subscriptions?action=preview  -> render con datos reales, sin enviar
-// POST   /api/subscriptions?action=test     -> envía solo al usuario logueado
+// POST   /api/subscriptions?action=test     -> envía una prueba a un solo correo (testRecipient;
+//                                             por defecto el del usuario), de un dominio permitido
 // POST   /api/subscriptions?action=slack&id=N -> preaviso en Slack (SLACK_CHANNEL) de una suscripción guardada
 // (todo en un archivo para no sumar Serverless Functions al plan Hobby)
 const AUDITED_FIELDS = ['title', 'organization', 'config', 'recipients', 'subject', 'schedule', 'language', 'active'];
@@ -57,9 +59,15 @@ async function handleAction(action, req, res, user) {
 
   if (action === 'test') {
     if (!isMailConfigured()) throw new HttpError(503, 'El envío de correo todavía no está configurado; por ahora solo está disponible la vista previa');
-    const outcome = await runSubscription(subscription, { kind: 'test', triggeredBy: user.email, testRecipient: user.email });
+    // Mismas reglas que los destinatarios: dominio global o de la Organization.
+    const domains = data.organization ? await db.getOrganizationDomains(data.organization.id) : [];
+    const { recipients, errors } = validateRecipients([body.testRecipient || user.email], domains);
+    if (errors.length || recipients.length !== 1) throw new HttpError(400, errors[0] || 'Ingresá un solo correo para la prueba');
+    const [testRecipient] = recipients;
+
+    const outcome = await runSubscription(subscription, { kind: 'test', triggeredBy: user.email, testRecipient });
     if (outcome.result !== 'ok') throw new HttpError(502, `No se pudo enviar la prueba: ${outcome.error}`);
-    sendJson(res, 200, { ok: true, sentTo: user.email, warnings });
+    sendJson(res, 200, { ok: true, sentTo: testRecipient, warnings });
     return;
   }
 
