@@ -12,6 +12,10 @@ const { t } = require('./i18n');
 //   Gmail lo ignora y muestra el claro), con dona y logo del footer en
 //   versión oscura.
 //
+// translate="no" / notranslate: el reporte ya está en el idioma de la
+// suscripción; sin esto Gmail lo traducía solo ("Status" -> "Estado de",
+// "Por Hacer" -> "Por hacer", "0.0%" -> "0,0%").
+//
 // `images` trae los src ya resueltos (cid:... para el correo, data: URI
 // para la vista previa), así la misma plantilla sirve para ambos.
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
@@ -106,13 +110,14 @@ function renderReportHtml({ title, cutoffDate, language = 'es', report, images, 
 <tr><td class="cs-card" style="${CARD_STYLE}">${openTicketsCard(report, tx, browseUrl)}</td></tr>`;
 
   return `<!DOCTYPE html>
-<html lang="${language === 'pt' ? 'pt-BR' : 'es'}">
+<html lang="${language === 'pt' ? 'pt-BR' : 'es'}" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="x-apple-disable-message-reformatting">
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
+<meta name="google" content="notranslate">
 <title>${esc(title)}</title>
 <style>
 @media only screen and (max-width: 820px) {
@@ -134,7 +139,7 @@ function renderReportHtml({ title, cutoffDate, language = 'es', report, images, 
 }
 </style>
 </head>
-<body class="cs-bg" style="margin:0;padding:0;background:${C.bg};">
+<body class="cs-bg notranslate" translate="no" style="margin:0;padding:0;background:${C.bg};">
 <table class="cs-bg" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${C.bg};">
 <tr><td align="center" style="padding:24px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:1180px;table-layout:fixed;">
