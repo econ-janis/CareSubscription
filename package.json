@@ -3,7 +3,7 @@
   "private": true,
   "description": "Notificaciones programadas de información de clientes de Janis Commerce a las áreas que corresponda. Primer módulo: reporte de tickets de JSM de los últimos 3 meses.",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
