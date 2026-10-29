@@ -92,7 +92,7 @@ Una suscripción puede abarcar más de una Organization, cada una con su logo. E
 - **JQL:** se usa tal cual. Comodines opcionales:
   - `{organization}` es la primera Organization;
   - `{organizations}` es la lista de todas, para usar con `IN`: `Organizations in {organizations}` → `("A", "B")`.
-- **Reporte:** un logo por Organization a la izquierda del título. En el envío agrupado, la sección y su bullet muestran todos los logos y los nombres unidos con " · ".
+- **Reporte:** un logo por Organization a la izquierda del título. En el envío agrupado, la fila del resumen y la sección muestran todos los logos; en el resumen, los nombres van unidos con " · ".
 - **Destinatarios:** se aceptan los dominios permitidos de cualquiera de las Organizations.
 - **Datos:** columna `subscriptions.organizations` (JSONB `[{ id, name, logoUrl }]`). La primera Organization también queda en `organization_id`, `organization_name` y `config.logoUrl`, para compatibilidad. Las suscripciones anteriores se leen como una sola Organization.
 
@@ -109,16 +109,17 @@ Una suscripción puede abarcar más de una Organization, cada una con su logo. E
 
 ## Envío agrupado (spec §10)
 
-Un solo correo con la información de varias suscripciones, una sección por Organization. Replica la maqueta `care-weekly-status-agrupado-ejemplo.html`.
+Un solo correo con la información de varias suscripciones, una sección por Organization. Formato **v2** (`caresubscribe-correo-agrupado-v2.md`, reemplaza §10.2): replica la maqueta `care-weekly-status-opcion-b-graficos.html`. Solo los últimos 3 meses, sin métricas semanales.
 
 - **Modelo:** la entidad `group_sends` tiene título, destinatarios, frecuencia, idioma, "no enviar si está vacío" y suscripciones incluidas. Cada suscripción conserva su título, sus logos, su JQL y sus Organizations.
 - **Solo destinatarios internos (con 2 o más suscripciones):** se aceptan solo direcciones de `INTERNAL_DOMAIN` (por defecto `janiscommerce.com`), sin importar los dominios permitidos de cada cliente. Se valida al guardar, al enviar y en las pruebas.
-- **Correo:** tiene, en este orden:
-  - un header con el isotipo, el título, el subtítulo y **"Ver en la web ↗"**;
-  - un bullet en forma de pill por Organization, con su logo y nombre, enlazado a `#org-<slug>`;
-  - por cada Organization, una sección con la barra separadora, su logo y título, la dona, el detalle, los tickets abiertos y "↑ Volver arriba".
+- **Correo (v2):** tablas, estilos inline, ancho máx. 680 px, `Montserrat, Arial, Helvetica, sans-serif`, sin `<style>`, JS ni SVG. En este orden:
+  - header con el isotipo, el título, "Tickets creados en los últimos 3 meses · Corte: <fecha>" y **"Ver en la web ↗"**;
+  - **tabla resumen**: una fila por suscripción con logo, nombre (enlace a `#org-<slug>`) y **barra apilada** por estado (celdas con `bgcolor`, sin imágenes), y las columnas Total / Resueltos / **Abiertos**; fila Total con las sumas. Si una Organization falla, su fila muestra "—". Debajo, la leyenda de colores de todos los estados;
+  - por cada suscripción: separador, logo + nombre visible (el título sin el prefijo común, por ejemplo "Care Weekly Status — Carrefour Argentina · PMC Gold" → "Carrefour Argentina · PMC Gold"), **dona chica** en PNG (192 px mostrada a 96) con el total al centro, la línea `67 tickets · 58 resueltos (87 %) · 9 abiertos` (`· N cancelados` solo si hay), la leyenda con cantidades > 0, la tarjeta **Tickets Abiertos** (clave, resumen y pill del estado) y "↑ Volver arriba";
+  - footer con el logo completo de Janis Commerce.
 
-  El orden es alfabético por Organization. Las imágenes van por CID, sin base64 en el HTML. Si el HTML supera ~100 KB, se avisa en el historial, porque Gmail podría recortarlo.
+  El orden es alfabético por Organization. Resueltos = estado `resolved`; abiertos = estados con `open: true`; la dona y la barra siguen `chartOrder` de `config/statuses.json` (Resuelto, Revisión, Esperando Información, En Desarrollo, En Progreso, Por Hacer, Cancelada). Cancelada (`hideWhenZero`) solo se muestra si tiene tickets. Pills y puntos usan `background-color` inline (Gmail descarta otros fondos). Las marcas de Janis van por URL pública (`/brand/*.png`) cuando se conoce la URL de la app; los logos y las donas van por CID con `Content-Disposition: inline`, así Gmail no los muestra como adjuntos. Nunca base64 en el HTML; si supera ~100 KB, se avisa en el historial.
 - **Landing:** `/reportes/<id>/<fecha>` (`?h=<historyId>` para un envío puntual) muestra la copia guardada en el historial. Requiere sesión: sin sesión, pide la clave y vuelve a la landing. La URL base sale de `APP_URL` o, si no está, de `VERCEL_PROJECT_PRODUCTION_URL`.
 - **Si falla una Organization:** el correo sale igual y su sección dice "No se pudo obtener la información". Si fallan todas, no se envía y se reintenta en la corrida siguiente.
 - **Historial:** un registro por envío (`send_history.group_id`), con el detalle por Organization. El dispatcher horario despacha suscripciones y envíos agrupados.

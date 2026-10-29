@@ -36,11 +36,11 @@ function cardTitle(text) {
 }
 
 function dot(color) {
-  return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:8px;vertical-align:middle;"></span>`;
+  return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:${color};margin-right:8px;vertical-align:middle;"></span>`;
 }
 
 function pill(label, color, textColor) {
-  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${color};color:${textColor};font-family:${FONT};font-size:12px;font-weight:600;line-height:1.45;white-space:nowrap;">${esc(label)}</span>`;
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background-color:${color};color:${textColor};font-family:${FONT};font-size:12px;font-weight:600;line-height:1.45;white-space:nowrap;">${esc(label)}</span>`;
 }
 
 function th(text, align = 'left') {

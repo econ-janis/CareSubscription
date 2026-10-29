@@ -1,132 +1,155 @@
-const { t } = require('./i18n');
-
-// HTML del envío agrupado (spec §10), réplica de la maqueta aprobada
-// (care-weekly-status-agrupado-ejemplo.html) en formato apto para correo:
-// tablas + estilos inline, sin JS ni SVG.
+// HTML del envío agrupado v2 (caresubscribe-correo-agrupado-v2.md, reemplaza
+// spec §10.2), réplica de la maqueta aprobada
+// (care-weekly-status-opcion-b-graficos.html) en formato apto para correo:
+// tablas role="presentation", estilos inline, ancho máx. 680 px, sin
+// <style>, JS ni SVG.
 //
-// - Header con el isotipo de Janis, título, subtítulo y "Ver en la web ↗"
-//   (solo en el correo: la landing es esa misma vista).
-// - Un bullet (pill) por Organization con su logo y nombre, enlazado a la
-//   sección (#org-<slug>). Las anclas llevan name e id: funcionan en Gmail
-//   web, Apple Mail y Outlook escritorio; en móviles puede que no, por eso
-//   está el enlace a la landing.
-// - Una sección por Organization: separador gris, logo + título de su
-//   suscripción, dona, detalle por estado, tickets abiertos y "↑ Volver arriba".
+// - Header: isotipo de Janis + título, subtítulo con la fecha de corte y
+//   "Ver en la web ↗" (solo en el correo: la landing es esta misma vista).
+// - Tabla resumen: una fila por Organization (logo + nombre enlazado a su
+//   sección + barra apilada por estado), Total / Resueltos / Abiertos y fila
+//   Total; debajo, la leyenda de colores.
+// - Una sección por Organization (#org-<slug>): separador, logo + nombre
+//   visible, dona chica + KPI, tarjeta "Tickets Abiertos" y "↑ Volver arriba".
 //
-// Los src de las imágenes vienen resueltos (cid:… en el correo, data: URI
-// en la landing/vista previa): nunca base64 dentro del correo (Gmail recorta
+// Colores de pills y puntos: background-color inline; barras y separadores:
+// además bgcolor de celda (Gmail y Outlook descartan otros fondos). Los src
+// de las imágenes vienen resueltos (URL, cid:… o data: URI en la landing /
+// vista previa): nunca base64 dentro del correo (Gmail recorta
 // el HTML de más de ~102 KB).
-const FONT = "Montserrat, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-const C = { bg: '#F4F6F9', card: '#FFFFFF', text: '#001233', muted: '#33415C', border: '#E3E6EB', link: '#2979FF', separator: '#A9B2C0' };
+const FONT = 'Montserrat, Arial, Helvetica, sans-serif';
+const C = { bg: '#F4F6F9', card: '#FFFFFF', text: '#001233', muted: '#33415C', border: '#E3E6EB', rowBorder: '#EEF0F3', link: '#2979FF', separator: '#A9B2C0' };
 const TOP_ANCHOR = 'inicio';
 
 const TEXTS = {
-  es: { web: 'Ver en la web ↗', top: '↑ Volver arriba', failed: 'No se pudo obtener la información.' },
-  pt: { web: 'Ver na web ↗', top: '↑ Voltar ao topo', failed: 'Não foi possível obter as informações.' },
+  es: {
+    subtitle: (date) => `Tickets creados en los últimos 3 meses · Corte: ${date}`,
+    web: 'Ver en la web ↗',
+    top: '↑ Volver arriba',
+    failed: 'No se pudo obtener la información.',
+    client: 'Cliente',
+    total: 'Total',
+    resolved: 'Resueltos',
+    open: 'Abiertos',
+    openTickets: 'Tickets Abiertos',
+    noOpenTickets: 'Sin tickets abiertos.',
+    kpi: (total, resolved, percent, open) => `${total} ${total === 1 ? 'ticket' : 'tickets'} · ${resolved} ${resolved === 1 ? 'resuelto' : 'resueltos'} (${percent} %) · <b>${open} ${open === 1 ? 'abierto' : 'abiertos'}</b>`,
+    cancelled: (n) => `${n} ${n === 1 ? 'cancelado' : 'cancelados'}`,
+    chartAlt: (total) => `Distribución por estado: ${total} tickets`,
+  },
+  pt: {
+    subtitle: (date) => `Tickets criados nos últimos 3 meses · Corte: ${date}`,
+    web: 'Ver na web ↗',
+    top: '↑ Voltar ao topo',
+    failed: 'Não foi possível obter as informações.',
+    client: 'Cliente',
+    total: 'Total',
+    resolved: 'Resolvidos',
+    open: 'Abertos',
+    openTickets: 'Tickets Abertos',
+    noOpenTickets: 'Sem tickets abertos.',
+    kpi: (total, resolved, percent, open) => `${total} ${total === 1 ? 'ticket' : 'tickets'} · ${resolved} ${resolved === 1 ? 'resolvido' : 'resolvidos'} (${percent} %) · <b>${open} ${open === 1 ? 'aberto' : 'abertos'}</b>`,
+    cancelled: (n) => `${n} ${n === 1 ? 'cancelado' : 'cancelados'}`,
+    chartAlt: (total) => `Distribuição por status: ${total} tickets`,
+  },
 };
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-const text = (size, extra = '') => `font-family:${FONT};font-size:${size}px;line-height:1.45;color:${C.text};${extra}`;
-const CARD = `background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:16px;vertical-align:top;${text(14)}`;
+const TABLE = 'role="presentation" cellpadding="0" cellspacing="0" border="0"';
 
 function dot(color) {
-  return `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:7px;vertical-align:middle;"></span>`;
+  return `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background-color:${color};font-size:0;line-height:0;vertical-align:middle;">&nbsp;</span>`;
 }
 
-function pill(label, color, textColor) {
-  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${color};color:${textColor};font-family:${FONT};font-size:11px;font-weight:600;line-height:1.45;white-space:nowrap;">${esc(label)}</span>`;
+// Leyenda: [{ label, color, total? }] (total solo en la de cada sección).
+function legend(items) {
+  return items.map((s) => `<span style="white-space:nowrap;">${dot(s.color)}&nbsp;${esc(s.label)}${s.total === undefined ? '' : ` <b>${s.total}</b>`}</span>`).join(' &nbsp; ');
 }
 
-function h3(value) {
-  return `<h3 style="margin:0 0 10px;${text(14, 'font-weight:700;')}">${esc(value)}</h3>`;
+// Pill: <span> con background-color, color, padding y border-radius inline
+// (Gmail descarta los fondos que no van así).
+function pill(status) {
+  return `<span style="background-color:${status.color};color:${status.textColor};border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;font-family:${FONT};white-space:nowrap;">${esc(status.label)}</span>`;
 }
 
-function th(value, align = 'left') {
-  return `<th align="${align}" style="text-align:${align};padding:7px 8px;border-bottom:1px solid ${C.border};${text(11, `font-weight:700;color:${C.muted};text-transform:uppercase;`)}${align === 'right' ? 'white-space:nowrap;' : ''}">${esc(value)}</th>`;
+// Barra apilada (§3.1): una celda por estado con valor, ancho proporcional.
+function stackedBar(segments, total) {
+  if (!total || !segments.length) return '';
+  const cells = segments.map((s) => `<td width="${((s.total * 100) / total).toFixed(2)}%" height="8" bgcolor="${s.color}" style="background-color:${s.color};font-size:0;line-height:0;">&nbsp;</td>`).join('');
+  return `<table ${TABLE} width="100%" style="margin-top:6px;border-radius:999px;overflow:hidden;max-width:220px;border-collapse:collapse;"><tr>${cells}</tr></table>`;
 }
 
-function td(html, { align = 'left', nowrap = false } = {}) {
-  return `<td align="${align}" style="text-align:${align};padding:7px 8px;border-bottom:1px solid ${C.border};vertical-align:top;${text(14)}${nowrap || align === 'right' ? 'white-space:nowrap;' : ''}">${html}</td>`;
+function logosHtml(logos, size) {
+  return logos.map((src, i) => `<img src="${esc(src)}" height="${size}" alt="" style="display:inline-block;vertical-align:middle;height:${size}px;width:auto;border:0;${i ? 'margin-left:4px;' : ''}">`).join('');
 }
 
-function table(rows) {
-  return `<div style="overflow-x:auto;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">${rows}</table></div>`;
+const TH = `padding:8px;border-bottom:2px solid ${C.border};font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:.03em;font-family:${FONT};`;
+const CELL = `padding:10px 8px;border-bottom:1px solid ${C.border};font-family:${FONT};`;
+
+// section: { slug, name, title, logos, chart, stats | null, segments, openTickets }
+function summaryRow(section) {
+  const name = `${logosHtml(section.logos, 24)}&nbsp;&nbsp;<a href="#org-${esc(section.slug)}" style="color:${C.link};text-decoration:none;font-weight:600;vertical-align:middle;">${esc(section.name)}</a>`;
+  const st = section.stats;
+  const num = (value, bold = false) => `<td align="right" style="${CELL}${bold ? 'font-weight:700;' : ''}">${st ? value : '—'}</td>`;
+  return `<tr><td style="${CELL}">${name}${st ? stackedBar(section.segments, st.total) : ''}</td>${num(st && st.total)}${num(st && st.resolved)}${num(st && st.open, true)}</tr>`;
 }
 
-function distributionCard(report, chartSrc, tx) {
-  const legend = report.segments.map((s) => `<span style="display:inline-block;margin:0 5px;white-space:nowrap;${text(12)}">${dot(s.color)}${esc(s.label)}</span>`).join('');
-  return `${h3(tx.distribution)}
-<img src="${esc(chartSrc)}" width="240" alt="${esc(tx.chartAlt(report.total))}" style="display:block;margin:0 auto;width:240px;max-width:100%;height:auto;border:0;">
-<div style="text-align:center;margin-top:6px;">${legend}</div>`;
+function summaryTable(sections, gx) {
+  const ok = sections.filter((s) => s.stats);
+  const sum = (field) => ok.reduce((acc, s) => acc + s.stats[field], 0);
+  const totalCell = (value, align = 'right') => `<td align="${align}" style="padding:10px 8px;font-weight:700;font-family:${FONT};">${value}</td>`;
+  return `<table ${TABLE} width="100%" style="background-color:${C.card};border:1px solid ${C.border};border-radius:12px;padding:8px 12px;font-size:14px;border-collapse:separate;">
+<tr><th align="left" style="${TH}">${esc(gx.client)}</th><th align="right" style="${TH}">${esc(gx.total)}</th><th align="right" style="${TH}">${esc(gx.resolved)}</th><th align="right" style="${TH}">${esc(gx.open)}</th></tr>
+${sections.map(summaryRow).join('\n')}
+<tr>${totalCell(esc(gx.total), 'left')}${totalCell(sum('total'))}${totalCell(sum('resolved'))}${totalCell(sum('open'))}</tr>
+</table>`;
 }
 
-function detailCard(report, tx) {
-  const rows = report.rows.map((r) => `<tr>${td(`${dot(r.color)}${esc(r.label)}`)}${td(`<b>${r.total}</b>`, { align: 'right' })}${td(`${r.percent.toFixed(1)}%`, { align: 'right' })}</tr>`).join('');
-  const total = `<tr>${td(`<b>${esc(tx.total)}</b>`)}${td(`<b>${report.total}</b>`, { align: 'right' })}${td(report.total ? '100%' : '0.0%', { align: 'right' })}</tr>`;
-  return `${h3(tx.detail)}${table(`<tr>${th(tx.status)}${th(tx.total, 'right')}${th(tx.percent, 'right')}</tr>${rows}${total}`)}`;
-}
-
-function openTicketsCard(report, tx, browseUrl) {
-  const rows = report.openTickets.length
-    ? report.openTickets.map((ticket) => `<tr>${td(`<a href="${esc(browseUrl(ticket.key))}" target="_blank" style="color:${C.link};text-decoration:none;white-space:nowrap;">${esc(ticket.key)}</a>`, { nowrap: true })}${td(esc(ticket.summary))}${td(pill(ticket.status.label, ticket.status.color, ticket.status.textColor), { align: 'right' })}</tr>`).join('')
-    : `<tr><td colspan="3" style="padding:7px 8px;border-bottom:1px solid ${C.border};${text(14)}">${esc(tx.noOpenTickets)}</td></tr>`;
-  return `${h3(tx.openTickets)}${table(`<tr>${th(tx.key)}${th(tx.summary)}${th(tx.status, 'right')}</tr>${rows}`)}`;
-}
-
-// Logos de la sección (varias Organizations) o el único logo (formato anterior).
-function logosOf(section) {
-  return section.logos || [section.logo];
-}
-
-function messageCard(message) {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;"><tr><td style="${CARD}"><span style="color:${C.muted};">${esc(message)}</span></td></tr></table>`;
-}
-
-// section: { slug, name, subscriptionTitle, logos: [src], chart, report | null }
-function sectionHtml(section, tx, gx, browseUrl) {
-  let body;
-  if (!section.report) {
-    body = messageCard(gx.failed);
-  } else if (section.report.total === 0) {
-    body = messageCard(tx.noTickets);
-  } else {
-    body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
-  <tr>
-    <td class="cg-col" width="266" style="${CARD}width:266px;">${distributionCard(section.report, section.chart, tx)}</td>
-    <td class="cg-gap" width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
-    <td class="cg-col cg-col-2" style="${CARD}">${detailCard(section.report, tx)}</td>
-  </tr>
-</table>
-<div style="height:14px;line-height:14px;font-size:0;">&nbsp;</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;"><tr><td style="${CARD}">${openTicketsCard(section.report, tx, browseUrl)}</td></tr></table>`;
-  }
-
-  const anchor = `org-${section.slug}`;
-  return `<tr><td style="padding:28px 0 0;">
-<a name="${esc(anchor)}" id="${esc(anchor)}"></a>
-<div style="height:6px;line-height:6px;font-size:0;border-radius:999px;background:${C.separator};margin:0 0 20px;">&nbsp;</div>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;border-collapse:collapse;"><tr>
-  <td style="vertical-align:middle;padding:0 10px 0 0;white-space:nowrap;">${logosOf(section).map((src, i) => `<img src="${esc(src)}" height="28" alt="" style="display:inline-block;vertical-align:middle;height:28px;width:auto;border:0;${i ? 'margin-left:6px;' : ''}">`).join('')}</td>
-  <td style="vertical-align:middle;"><h2 style="margin:0;${text(18, 'font-weight:700;')}">${esc(section.subscriptionTitle)}</h2></td>
-</tr></table>
-${body}
-<div style="text-align:right;margin:10px 0 18px;${text(12)}"><a href="#${TOP_ANCHOR}" style="color:${C.link};text-decoration:none;">${esc(gx.top)}</a></div>
-</td></tr>`;
-}
-
-// mode 'email': incluye "Ver en la web ↗" (si hay webUrl). mode 'web': la landing.
-function renderGroupHtml({ title, cutoffDate, language = 'es', sections, images, webUrl = '', mode = 'email', browseUrl }) {
-  const tx = t(language);
-  const gx = TEXTS[language] || TEXTS.es;
-
-  const bullets = sections.map((s) => `<a href="#org-${esc(s.slug)}" style="display:inline-block;margin:0 8px 8px 0;background:${C.card};border:1px solid ${C.border};border-radius:999px;padding:6px 14px 6px 10px;font-family:${FONT};font-size:14px;line-height:20px;font-weight:600;color:${C.link};text-decoration:none;white-space:nowrap;">${logosOf(s).map((src) => `<img src="${esc(src)}" height="20" alt="" style="display:inline-block;vertical-align:middle;height:20px;width:auto;border:0;margin-right:8px;">`).join('')}${esc(s.name)}</a>`).join('');
-
-  const webLink = mode === 'email' && webUrl
-    ? `<tr><td style="padding:0 0 16px;${text(12)}"><a href="${esc(webUrl)}" target="_blank" style="color:${C.link};">${esc(gx.web)}</a></td></tr>`
+function kpiBlock(section, gx) {
+  const st = section.stats;
+  const percent = st.total ? Math.round((st.resolved * 100) / st.total) : 0;
+  const line = `${gx.kpi(st.total, st.resolved, percent, st.open)}${st.cancelled ? ` · ${esc(gx.cancelled(st.cancelled))}` : ''}`;
+  const chart = section.chart
+    ? `<img src="${esc(section.chart)}" width="96" height="96" alt="${esc(gx.chartAlt(st.total))}" style="display:block;width:96px;height:96px;border:0;">`
     : '';
+  return `<tr><td style="padding:6px 0 12px;"><table ${TABLE}><tr>
+<td width="100" valign="middle" style="width:100px;">${chart}</td>
+<td valign="middle" style="padding-left:14px;color:${C.muted};font-size:13px;line-height:1.7;font-family:${FONT};">${line}${section.segments.length ? `<br>${legend(section.segments)}` : ''}</td>
+</tr></table></td></tr>`;
+}
+
+function openTicketsCard(section, gx, browseUrl) {
+  const td = `padding:7px 8px;border-bottom:1px solid ${C.rowBorder};font-family:${FONT};`;
+  const rows = section.openTickets.length
+    ? section.openTickets.map((ticket) => `<tr><td valign="top" style="${td}white-space:nowrap;"><a href="${esc(browseUrl(ticket.key))}" target="_blank" style="color:${C.link};text-decoration:none;">${esc(ticket.key)}</a></td><td style="${td}">${esc(ticket.summary)}</td><td valign="top" align="right" style="${td}white-space:nowrap;">${pill(ticket.status)}</td></tr>`).join('\n')
+    : `<tr><td colspan="3" style="${td}color:${C.muted};">${esc(gx.noOpenTickets)}</td></tr>`;
+  return `<tr><td><table ${TABLE} width="100%" style="background-color:${C.card};border:1px solid ${C.border};border-radius:12px;padding:4px 12px 10px;font-size:14px;border-collapse:separate;">
+<tr><td colspan="3" style="padding:12px 8px 8px;font-size:15px;font-weight:700;color:${C.text};font-family:${FONT};">${esc(gx.openTickets)}</td></tr>
+${rows}
+</table></td></tr>`;
+}
+
+function sectionHtml(section, gx, browseUrl) {
+  const anchor = `org-${section.slug}`;
+  const body = section.stats
+    ? `${kpiBlock(section, gx)}\n${openTicketsCard(section, gx, browseUrl)}`
+    : `<tr><td style="padding:6px 0 0;"><table ${TABLE} width="100%" style="background-color:${C.card};border:1px solid ${C.border};border-radius:12px;border-collapse:separate;"><tr><td style="padding:16px;color:${C.muted};font-size:14px;font-family:${FONT};">${esc(gx.failed)}</td></tr></table></td></tr>`;
+  return `<tr><td style="padding:28px 0 0;"><table ${TABLE} width="100%"><tr><td height="6" bgcolor="${C.separator}" style="background-color:${C.separator};border-radius:999px;font-size:0;line-height:0;">&nbsp;</td></tr></table></td></tr>
+<tr><td id="${esc(anchor)}" style="padding:18px 0 4px;"><a name="${esc(anchor)}" id="${esc(anchor)}-a"></a>${logosHtml(section.logos, 30)}&nbsp;&nbsp;<span style="font-size:18px;font-weight:700;vertical-align:middle;">${esc(section.title)}</span></td></tr>
+${body}
+<tr><td align="right" style="padding:8px 0;font-size:12px;"><a href="#${TOP_ANCHOR}" style="color:${C.link};text-decoration:none;">${esc(gx.top)}</a></td></tr>`;
+}
+
+// legendItems: todos los estados en el orden del gráfico [{ label, color }].
+// mode 'email': incluye "Ver en la web ↗" (si hay webUrl). mode 'web': la landing.
+function renderGroupHtml({ title, cutoffDate, language = 'es', sections, legendItems = [], images, webUrl = '', mode = 'email', browseUrl }) {
+  const gx = TEXTS[language] || TEXTS.es;
+  const webLink = mode === 'email' && webUrl
+    ? `<tr><td style="padding:0 0 16px;font-size:12px;"><a href="${esc(webUrl)}" target="_blank" style="color:${C.link};">${esc(gx.web)}</a></td></tr>`
+    : '<tr><td style="padding:0 0 12px;font-size:0;line-height:0;">&nbsp;</td></tr>';
 
   return `<!DOCTYPE html>
 <html lang="${language === 'pt' ? 'pt-BR' : 'es'}" translate="no">
@@ -136,39 +159,21 @@ function renderGroupHtml({ title, cutoffDate, language = 'es', sections, images,
 <meta name="x-apple-disable-message-reformatting">
 <meta name="google" content="notranslate">
 <title>${esc(title)}</title>
-<style>
-@media only screen and (max-width: 700px) {
-  .cg-col { display: block !important; width: auto !important; }
-  .cg-gap { display: none !important; }
-  .cg-col-2 { margin-top: 14px !important; }
-}
-</style>
 </head>
-<body class="notranslate" translate="no" style="margin:0;padding:0;background:${C.bg};">
-<a name="${TOP_ANCHOR}" id="${TOP_ANCHOR}"></a>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${C.bg};">
-<tr><td align="center" style="padding:24px 16px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:900px;table-layout:fixed;">
-<tr><td style="padding:0;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
-    <td style="vertical-align:middle;padding:0 14px 0 0;"><img src="${esc(images.iso)}" height="34" alt="Janis" style="display:block;height:34px;width:auto;border:0;"></td>
-    <td style="vertical-align:middle;"><h1 style="margin:0;${text(22, 'font-weight:700;')}">${esc(title)}</h1></td>
-  </tr></table>
-</td></tr>
-<tr><td style="padding:4px 0 16px;${text(14, `color:${C.muted};`)}">${esc(tx.subtitle(cutoffDate))}</td></tr>
+<body class="notranslate" translate="no" style="margin:0;padding:0;background-color:${C.bg};color:${C.text};font-family:${FONT};">
+<table ${TABLE} width="100%" bgcolor="${C.bg}" style="width:100%;background-color:${C.bg};"><tr><td align="center" style="padding:24px 12px;">
+<table ${TABLE} width="100%" style="width:100%;max-width:680px;font-family:${FONT};color:${C.text};">
+<tr><td id="${TOP_ANCHOR}"><a name="${TOP_ANCHOR}" id="${TOP_ANCHOR}-a"></a><img src="${esc(images.iso)}" height="32" alt="Janis" style="height:32px;width:auto;border:0;vertical-align:middle;">&nbsp;&nbsp;<span style="font-size:22px;font-weight:700;vertical-align:middle;">${esc(title)}</span></td></tr>
+<tr><td style="padding:6px 0 4px;color:${C.muted};font-size:13px;">${esc(gx.subtitle(cutoffDate))}</td></tr>
 ${webLink}
-<tr><td style="padding:0 0 16px;font-size:0;line-height:0;">${bullets}</td></tr>
-${sections.map((s) => sectionHtml(s, tx, gx, browseUrl)).join('\n')}
-<tr><td align="center" style="padding:8px 0 0;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-top:1px solid ${C.border};">
-    <tr><td align="center" style="padding:24px 0 8px;"><img src="${esc(images.footer)}" height="32" alt="Janis Commerce" style="display:block;margin:0 auto;height:32px;width:auto;border:0;"></td></tr>
-  </table>
-</td></tr>
+<tr><td>${summaryTable(sections, gx)}</td></tr>
+<tr><td style="padding:8px 4px 0;font-size:12px;color:${C.muted};">${legend(legendItems)}</td></tr>
+${sections.map((s) => sectionHtml(s, gx, browseUrl)).join('\n')}
+<tr><td align="center" style="border-top:1px solid ${C.border};padding:24px 0 8px;"><img src="${esc(images.footer)}" height="32" alt="Janis Commerce" style="display:block;margin:0 auto;height:32px;width:auto;border:0;"></td></tr>
 </table>
-</td></tr>
-</table>
+</td></tr></table>
 </body>
 </html>`;
 }
 
-module.exports = { renderGroupHtml, TOP_ANCHOR };
+module.exports = { renderGroupHtml, TOP_ANCHOR, TEXTS };
