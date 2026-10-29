@@ -84,6 +84,7 @@ function loadRunner({ subscriptions = [{ id: 1 }], built }) {
     getSubscriptionsByIds: async () => subscriptions,
     addHistory: async (entry) => calls.history.push(entry),
     getOrganizationDomains: async () => [],
+    getOrganizationsDomains: async () => [],
   });
   stub('lib/mailer.js', { sendMail: async (mail) => calls.sent.push(mail), isMailConfigured: () => true });
   stub('modules/index.js', { getModule: () => ({ buildGroup: async (group, subs, options) => ({ subject: 'S', html: '<p>', text: '', attachments: [], snapshot: { webUrl: options.webUrl }, itemCount: 3, failedSections: 0, warnings: [], ...built }) }) });
@@ -117,4 +118,13 @@ test('runGroup: si fallan todas las Organizations no envía y se reintenta', asy
   assert.equal(outcome.result, 'error');
   assert.equal(outcome.transient, true);
   assert.equal(calls.sent.length, 0);
+});
+
+test('suscripción con varias Organizations: nombre y orden por sus Organizations', () => {
+  const { sectionName } = require('../modules/ticket-report/group');
+  const multi = { title: 't', organization: { name: 'TATA Uruguay' }, organizations: [{ name: 'TATA Uruguay' }, { name: 'Vierci Paraguay' }] };
+  const legacy = { title: 't', organization: { name: 'Alfa' }, config: {} };
+  assert.equal(sectionName(multi), 'TATA Uruguay · Vierci Paraguay');
+  assert.equal(sectionName(legacy), 'Alfa');
+  assert.deepEqual(sortSubscriptions([multi, legacy]).map(sectionName), ['Alfa', 'TATA Uruguay · Vierci Paraguay']);
 });

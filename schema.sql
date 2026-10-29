@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   module TEXT NOT NULL,
   title TEXT NOT NULL,
   organization_id TEXT NOT NULL,
-  organization_name TEXT NOT NULL,
+  organization_name TEXT NOT NULL,           -- primera Organization (compatibilidad)
+  organizations JSONB,                        -- todas: [{ id, name, logoUrl }]
   config JSONB NOT NULL DEFAULT '{}'::jsonb,
   recipients TEXT[] NOT NULL DEFAULT '{}',
   subject TEXT NOT NULL DEFAULT '',

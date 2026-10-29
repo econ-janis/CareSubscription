@@ -43,6 +43,9 @@
   .sub-picker label:hover { background: var(--bg); }
   .sub-picker .org-logo, .org-logos .org-logo { width: 28px; height: 28px; flex: 0 0 28px; padding: 2px; border-radius: 8px; }
   .org-logos { display: flex; gap: 4px; flex-wrap: wrap; max-width: 220px; }
+  .org-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .org-stack { display: inline-flex; gap: 4px; flex-wrap: wrap; max-width: 140px; }
+  @media (max-width: 720px) { .org-row { grid-template-columns: 1fr auto; } .org-row .org-logo-input { grid-column: 1 / 2; } }
   table.list { width: 100%; border-collapse: collapse; }
   table.list th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--muted); padding: 8px; border-bottom: 2px solid var(--border); }
   table.list td { padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -156,29 +159,27 @@
       <label for="f-title">Título <span class="req">*</span></label>
       <input type="text" id="f-title" maxlength="200" placeholder="Care Weekly Status — Cliente · Plan">
 
-      <div class="grid">
-        <div>
-          <label for="f-org">Organization <span class="req">*</span></label>
-          <div class="row" style="flex-wrap:nowrap;">
-            <select id="f-org"><option value="">Cargando…</option></select>
-            <button type="button" class="icon-btn" id="refreshOrgs" title="Refrescar lista desde Jira">↻</button>
-          </div>
-          <div class="muted" id="orgsFetched"></div>
-        </div>
-        <div>
-          <label for="f-logo">Logo URL <span class="muted">(opcional · HTTPS, PNG/JPEG, máx. 500 KB)</span></label>
-          <input type="url" id="f-logo" placeholder="https://… (vacío = isotipo de Janis)">
-        </div>
+      <label>Organizations <span class="req">*</span> <span class="muted">(una o más, cada una con su logo opcional · HTTPS, PNG/JPEG, máx. 500 KB)</span></label>
+      <div id="orgRows"></div>
+      <div class="row" style="margin-top:6px;">
+        <button type="button" id="addOrgRow">+ Agregar Organization</button>
+        <span class="spacer"></span>
+        <span class="muted" id="orgsFetched"></span>
+        <button type="button" class="icon-btn" id="refreshOrgs" title="Refrescar lista desde Jira">↻</button>
       </div>
 
-      <label for="f-jql">JQL <span class="req">*</span> <span class="muted">— se usa tal cual en Jira (opcional: <code>{organization}</code> se reemplaza por la Organization elegida)</span></label>
+      <label for="f-jql">JQL <span class="req">*</span> <span class="muted">— se usa tal cual en Jira (opcional: <code>{organization}</code> = la primera Organization; <code>{organizations}</code> = todas, para <code>Organizations in {organizations}</code>)</span></label>
       <textarea id="f-jql" spellcheck="false"></textarea>
       <div id="jqlWarn" class="msg warn hidden">El JQL no filtra por Organization: el reporte incluiría tickets de todos los clientes del proyecto y se enviaría a los destinatarios de esta suscripción.</div>
 
       <label for="f-recipients">Destinatarios <span class="req">*</span> <span class="muted">(uno por línea o separados por coma)</span></label>
       <textarea id="f-recipients" style="min-height:70px;font-family:inherit;font-size:13px;" spellcheck="false"></textarea>
       <div class="domains-box">
-        <div class="muted">Dominios permitidos para esta Organization:</div>
+        <div class="row" style="gap:8px;">
+          <span class="muted">Dominios permitidos para</span>
+          <select id="f-domains-org" style="width:auto;min-width:200px;padding:4px 10px;"></select>
+          <span class="muted">(se aceptan los de todas las Organizations de la suscripción)</span>
+        </div>
         <div class="chips" id="domainChips"></div>
         <div class="row" style="margin-top:8px;">
           <input type="text" id="f-domains" placeholder="Dominios del cliente, ej: cliente.com, cliente.com.ar" disabled>
@@ -440,9 +441,21 @@
   // Logo de la Organization (Logo URL de la suscripción); si no hay o no
   // carga, el isotipo de Janis, igual que en el correo.
   const FALLBACK_LOGO = '/brand/iso-color.svg';
+  // Organizations de una suscripción [{ id, name, logoUrl }] (las anteriores
+  // a "varias Organizations" solo traen organization + config.logoUrl).
+  function subOrgs(s) {
+    return s.organizations && s.organizations.length ? s.organizations : [{ ...s.organization, logoUrl: s.config.logoUrl || '' }];
+  }
+  function subOrgNames(s) {
+    return subOrgs(s).map((o) => o.name).join(' · ');
+  }
+  function logoImg(logoUrl, alt) {
+    const url = /^https:\/\//i.test(logoUrl || '') ? logoUrl : FALLBACK_LOGO;
+    return `<img class="org-logo" src="${esc(url)}" alt="${esc(alt)}" title="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${FALLBACK_LOGO}'">`;
+  }
   function orgLogo(s) {
-    const url = /^https:\/\//i.test(s.config.logoUrl || '') ? s.config.logoUrl : FALLBACK_LOGO;
-    return `<img class="org-logo" src="${esc(url)}" alt="${esc(s.organization.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${FALLBACK_LOGO}'">`;
+    const orgs = subOrgs(s);
+    return orgs.length === 1 ? logoImg(orgs[0].logoUrl, orgs[0].name) : `<span class="org-stack">${orgs.map((o) => logoImg(o.logoUrl, o.name)).join('')}</span>`;
   }
 
   // Fecha/hora en la zona horaria de la suscripción, ej. "mié 04/11, 09:00".
@@ -482,7 +495,7 @@
     }
     body.innerHTML = state.subscriptions.map((s) => `<tr>
       <td title="${esc(s.title)}">${orgLogo(s)}</td>
-      <td>${esc(s.organization.name)}</td>
+      <td>${subOrgs(s).map((o) => esc(o.name)).join('<br>')}</td>
       <td>${scheduleText(s.schedule)}</td>
       <td style="white-space:nowrap;">${sendsText(s)}</td>
       <td>${s.recipients.length}</td>
@@ -513,30 +526,84 @@
   }
 
   // ---- Organizations y dominios ----
+  // Una línea por Organization: desplegable + Logo URL + quitar.
+  function fillOrgSelect(select, id, name) {
+    if (!state.orgsLoaded) {
+      select.innerHTML = '<option value="">Cargando…</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">Elegí una Organization…</option>' + state.organizations.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join('');
+    if (id && !state.organizations.some((o) => o.id === id)) {
+      select.insertAdjacentHTML('beforeend', `<option value="${esc(id)}">${esc(name || id)} (no encontrada en Jira)</option>`);
+    }
+    select.value = id || '';
+  }
+
+  function addOrgRow(org = { id: '', name: '', logoUrl: '' }) {
+    const row = document.createElement('div');
+    row.className = 'org-row';
+    row.innerHTML = `<select class="org-select" aria-label="Organization"></select>
+      <input type="url" class="org-logo-input" aria-label="Logo URL" placeholder="Logo URL (vacío = isotipo de Janis)">
+      <button type="button" class="icon-btn org-remove" title="Quitar esta Organization">✕</button>`;
+    row.dataset.id = org.id || '';
+    row.dataset.name = org.name || '';
+    row.querySelector('.org-logo-input').value = org.logoUrl || '';
+    const select = row.querySelector('.org-select');
+    fillOrgSelect(select, row.dataset.id, row.dataset.name);
+    select.onchange = () => { row.dataset.id = select.value; updateOrgRows(); };
+    row.querySelector('.org-remove').onclick = () => { row.remove(); updateOrgRows(); };
+    $('orgRows').appendChild(row);
+    updateOrgRows();
+    return row;
+  }
+
+  function orgRowsValue() {
+    return [...$('orgRows').querySelectorAll('.org-row')]
+      .map((row) => ({ id: row.querySelector('.org-select').value || row.dataset.id, logoUrl: row.querySelector('.org-logo-input').value.trim() }))
+      .filter((o) => o.id);
+  }
+
+  function orgName(id) {
+    const found = (state.organizations || []).find((o) => o.id === id);
+    if (found) return found.name;
+    const row = [...$('orgRows').querySelectorAll('.org-row')].find((r) => r.dataset.id === id);
+    return (row && row.dataset.name) || id;
+  }
+
+  // Quitar solo si queda más de una línea; el selector de dominios sigue a las elegidas.
+  function updateOrgRows() {
+    const rows = [...$('orgRows').querySelectorAll('.org-row')];
+    rows.forEach((r) => r.querySelector('.org-remove').classList.toggle('hidden', rows.length === 1));
+    const select = $('f-domains-org');
+    const current = select.value;
+    const chosen = orgRowsValue();
+    select.innerHTML = chosen.length ? chosen.map((o) => `<option value="${esc(o.id)}">${esc(orgName(o.id))}</option>`).join('') : '<option value="">(elegí una Organization)</option>';
+    if (chosen.some((o) => o.id === current)) select.value = current;
+    loadDomains();
+  }
+
+  $('addOrgRow').onclick = () => addOrgRow().querySelector('.org-select').focus();
+  $('f-domains-org').onchange = loadDomains;
+
   async function loadOrganizations(refresh = false) {
-    const select = $('f-org');
-    const source = state.formSource;
-    const current = select.value || (source && source.organization.id) || '';
     try {
       const { organizations, fetchedAt } = await api(`/api/organizations${refresh ? '?refresh=1' : ''}`);
       state.organizations = organizations;
-      $('orgsFetched').textContent = `Lista de Jira actualizada: ${fmtDateTime(fetchedAt)}`;
-      select.innerHTML = '<option value="">Elegí una Organization…</option>' + organizations.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join('');
-      if (current && !organizations.some((o) => o.id === current) && source && source.organization.name) {
-        select.insertAdjacentHTML('beforeend', `<option value="${esc(current)}">${esc(source.organization.name)} (no encontrada en Jira)</option>`);
-      }
-      select.value = current;
-      loadDomains();
+      state.orgsLoaded = true;
+      $('orgsFetched').textContent = `Lista de Jira: ${fmtDateTime(fetchedAt)}`;
+      $('orgRows').querySelectorAll('.org-row').forEach((row) => {
+        const select = row.querySelector('.org-select');
+        fillOrgSelect(select, select.value || row.dataset.id, row.dataset.name);
+      });
+      updateOrgRows();
     } catch (error) {
-      select.innerHTML = '<option value="">No se pudo cargar</option>';
       errorMsg('formMsg', error);
     }
   }
   $('refreshOrgs').onclick = () => busy($('refreshOrgs'), () => loadOrganizations(true));
-  $('f-org').onchange = loadDomains;
 
   async function loadDomains() {
-    const orgId = $('f-org').value;
+    const orgId = $('f-domains-org').value;
     $('f-domains').disabled = $('saveDomains').disabled = !orgId;
     if (!orgId) { $('domainChips').innerHTML = '<span class="muted">Elegí una Organization.</span>'; $('f-domains').value = ''; return; }
     try {
@@ -554,7 +621,7 @@
 
   $('saveDomains').onclick = () => busy($('saveDomains'), async () => {
     try {
-      const { global, domains } = await api(`/api/organizations?domains=${encodeURIComponent($('f-org').value)}`, { method: 'PUT', body: { domains: $('f-domains').value } });
+      const { global, domains } = await api(`/api/organizations?domains=${encodeURIComponent($('f-domains-org').value)}`, { method: 'PUT', body: { domains: $('f-domains').value } });
       renderDomains(global, domains);
       showMsg('formMsg', 'ok', 'Dominios guardados.');
     } catch (error) {
@@ -571,7 +638,7 @@
   const ORGANIZATIONS_CLAUSE = /\borganizations\s*(=|!=|!~|~|\bin\b|\bnot\s+in\b|\bis\b)/i;
   $('f-jql').oninput = () => {
     const jql = $('f-jql').value;
-    $('jqlWarn').classList.toggle('hidden', !jql.trim() || jql.includes('{organization}') || ORGANIZATIONS_CLAUSE.test(jql));
+    $('jqlWarn').classList.toggle('hidden', !jql.trim() || jql.includes('{organization}') || jql.includes('{organizations}') || ORGANIZATIONS_CLAUSE.test(jql));
   };
 
   // copy: abre "Nueva suscripción" con los datos de `subscription` (no la
@@ -580,12 +647,11 @@
     state.editing = subscription && !copy ? subscription : null;
     const defaults = (state.modules.find((m) => m.id === 'ticket-report') || {}).defaultConfig || {};
     const s = subscription || { title: '', organization: { id: '' }, config: defaults, recipients: [], subject: '', schedule: { days: [1], time: '09:00', timezone: DEFAULT_TZ }, language: 'es', active: true };
-    state.formSource = s;
 
     $('formTitle').textContent = copy ? 'Nueva suscripción (copia)' : (subscription ? 'Editar suscripción' : 'Nueva suscripción');
     $('f-title').value = copy ? `${s.title} (copia)` : s.title;
-    $('f-org').value = s.organization.id;
-    $('f-logo').value = s.config.logoUrl || '';
+    $('orgRows').innerHTML = '';
+    (subscription ? subOrgs(s) : [{ id: '', name: '', logoUrl: '' }]).forEach((o) => addOrgRow(o));
     $('f-jql').value = s.config.jql || '';
     $('f-recipients').value = s.recipients.join('\n');
     $('f-subject').value = s.subject;
@@ -599,7 +665,6 @@
     $('f-jql').oninput();
     clearMsg('formMsg');
     $('formDlg').showModal();
-    $('f-org').innerHTML = '<option value="">Cargando…</option>';
     loadOrganizations();
     if (copy) showMsg('formMsg', 'ok', 'Copia de la suscripción: ajustá lo que necesites y guardá para crearla.');
   }
@@ -610,8 +675,8 @@
       id: state.editing ? state.editing.id : undefined,
       module: 'ticket-report',
       title: $('f-title').value,
-      organization: { id: $('f-org').value },
-      config: { jql: $('f-jql').value, logoUrl: $('f-logo').value, skipIfEmpty: $('f-skip').checked },
+      organizations: orgRowsValue(),
+      config: { jql: $('f-jql').value, skipIfEmpty: $('f-skip').checked },
       recipients: $('f-recipients').value,
       subject: $('f-subject').value,
       language: $('f-lang').value,
@@ -793,7 +858,7 @@
         .sort((a, b) => a.organization.name.localeCompare(b.organization.name, 'es'));
       return `<tr>
       <td><strong>${esc(g.name)}</strong></td>
-      <td><div class="org-logos">${subs.map((s) => `<span title="${esc(s.organization.name)}">${orgLogo(s)}</span>`).join('') || '<span class="muted">—</span>'}</div></td>
+      <td><div class="org-logos">${subs.map((s) => orgLogo(s)).join('') || '<span class="muted">—</span>'}</div></td>
       <td>${scheduleText(g.schedule)}</td>
       <td style="white-space:nowrap;">${sendsText(g)}</td>
       <td>${g.recipients.length}</td>
@@ -809,7 +874,7 @@
   function renderSubscriptionPicker(selected) {
     const subs = [...state.subscriptions].sort((a, b) => a.organization.name.localeCompare(b.organization.name, 'es') || a.title.localeCompare(b.title, 'es'));
     $('g-subs').innerHTML = subs.length
-      ? subs.map((s) => `<label><input type="checkbox" value="${s.id}" ${selected.includes(s.id) ? 'checked' : ''}>${orgLogo(s)}<span><strong>${esc(s.organization.name)}</strong><div class="muted">${esc(s.title)}${s.active ? '' : ' · pausada (solo se envía en agrupados)'}</div></span></label>`).join('')
+      ? subs.map((s) => `<label><input type="checkbox" value="${s.id}" ${selected.includes(s.id) ? 'checked' : ''}>${orgLogo(s)}<span><strong>${esc(subOrgNames(s))}</strong><div class="muted">${esc(s.title)}${s.active ? '' : ' · pausada (solo se envía en agrupados)'}</div></span></label>`).join('')
       : '<div class="muted" style="padding:8px;">Primero creá suscripciones por Organization.</div>';
   }
 

@@ -4,7 +4,7 @@ const { uniqueSlugs } = require('../../lib/slug');
 const { renderDonutPng } = require('./chart');
 const { renderGroupHtml } = require('./group-template');
 const { t } = require('./i18n');
-const { fetchReport, resolveLogo, JANIS_ISO, JANIS_LOGO } = require('./report');
+const { fetchReport, resolveLogo, organizationsOf, JANIS_ISO, JANIS_LOGO } = require('./report');
 
 // Envío agrupado (spec §10): un solo correo con las secciones de varias
 // suscripciones (una por Organization). Se consulta Jira por cada una; si
@@ -25,9 +25,14 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
+// Nombre visible de una suscripción en el agrupado: sus Organizations.
+function sectionName(subscription) {
+  return organizationsOf(subscription).map((o) => o.name).join(' · ');
+}
+
 // Orden de bullets y secciones: alfabético por nombre de Organization.
 function sortSubscriptions(subscriptions) {
-  return [...subscriptions].sort((a, b) => a.organization.name.localeCompare(b.organization.name, 'es') || a.title.localeCompare(b.title, 'es'));
+  return [...subscriptions].sort((a, b) => sectionName(a).localeCompare(sectionName(b), 'es') || a.title.localeCompare(b.title, 'es'));
 }
 
 // Dibuja el correo (mode 'email': imágenes por CID) o la landing / vista
@@ -41,18 +46,22 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
   const src = (image) => (mode === 'email' ? `cid:${image.cid}` : `data:${image.contentType};base64,${image.buffer.toString('base64')}`);
 
   const sections = await mapLimit(snapshot.sections, JIRA_CONCURRENCY, async (section) => {
-    const logo = await resolveLogo(section.logoUrl, warnings);
+    // Un logo por Organization de la suscripción (snapshots anteriores: logoUrl).
     // Sin logo propio se reutiliza el isotipo (un solo adjunto).
-    const logoImage = logo.fallback ? images[0] : { cid: `logo-${section.slug}@caresubscription`, name: `logo-${section.slug}`, buffer: logo.buffer, contentType: logo.contentType };
+    const urls = section.logoUrls || [section.logoUrl];
+    const logoImages = await Promise.all(urls.map(async (url, i) => {
+      const logo = await resolveLogo(url, warnings);
+      return logo.fallback ? images[0] : { cid: `logo-${section.slug}-${i}@caresubscription`, name: `logo-${section.slug}-${i}`, buffer: logo.buffer, contentType: logo.contentType };
+    }));
     const report = section.ok ? section.snapshot.report : null;
     const chartImage = report && report.total > 0
       ? { cid: `chart-${section.slug}@caresubscription`, name: `distribucion-${section.slug}.png`, buffer: renderDonutPng(report.segments, report.total, tx.donutCenter, 'group'), contentType: 'image/png' }
       : null;
-    return { section, report, logoImage, chartImage };
+    return { section, report, logoImages, chartImage };
   });
 
-  for (const { logoImage, chartImage } of sections) {
-    if (!images.includes(logoImage)) images.push(logoImage);
+  for (const { logoImages, chartImage } of sections) {
+    for (const logoImage of logoImages) if (!images.includes(logoImage)) images.push(logoImage);
     if (chartImage) images.push(chartImage);
   }
 
@@ -64,11 +73,11 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
     mode: mode === 'email' ? 'email' : 'web',
     browseUrl,
     images: { iso: src(images[0]), footer: src(images[1]) },
-    sections: sections.map(({ section, report, logoImage, chartImage }) => ({
+    sections: sections.map(({ section, report, logoImages, chartImage }) => ({
       slug: section.slug,
       name: section.name,
       subscriptionTitle: section.subscriptionTitle,
-      logo: src(logoImage),
+      logos: logoImages.map(src),
       chart: chartImage ? src(chartImage) : '',
       report,
     })),
@@ -95,21 +104,21 @@ async function buildGroup(group, subscriptions, { now = new Date(), mode = 'emai
   const warnings = [];
   const language = group.language || 'es';
   const ordered = sortSubscriptions(subscriptions);
-  const slugs = uniqueSlugs(ordered.map((s) => s.organization.name));
+  const slugs = uniqueSlugs(ordered.map(sectionName));
 
   const sections = await mapLimit(ordered, JIRA_CONCURRENCY, async (subscription, index) => {
     const base = {
       slug: slugs[index],
-      name: subscription.organization.name,
+      name: sectionName(subscription),
       subscriptionId: subscription.id,
       subscriptionTitle: subscription.title,
-      logoUrl: subscription.config.logoUrl || '',
+      logoUrls: organizationsOf(subscription).map((o) => o.logoUrl || ''),
     };
     try {
       return { ...base, ok: true, snapshot: { report: await fetchReport(subscription, language, warnings) } };
     } catch (error) {
-      console.error(`[ticket-report] envío agrupado: falló ${subscription.organization.name}: ${error.message}`);
-      warnings.push(`${subscription.organization.name}: no se pudo obtener la información (${error.message})`);
+      console.error(`[ticket-report] envío agrupado: falló ${base.name}: ${error.message}`);
+      warnings.push(`${base.name}: no se pudo obtener la información (${error.message})`);
       return { ...base, ok: false, error: error.message };
     }
   });
@@ -147,4 +156,4 @@ async function renderGroupSnapshot(snapshot) {
   return { subject: snapshot.subject, html, warnings };
 }
 
-module.exports = { buildGroup, renderGroupSnapshot, sortSubscriptions };
+module.exports = { buildGroup, renderGroupSnapshot, sortSubscriptions, sectionName };

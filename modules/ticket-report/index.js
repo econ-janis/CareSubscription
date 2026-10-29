@@ -6,7 +6,7 @@ const { renderDonutPng } = require('./chart');
 const { renderReportHtml } = require('./template');
 const { t } = require('./i18n');
 const { buildSlackComment } = require('./slack');
-const { fetchReport, resolveLogo, JANIS_LOGO, JANIS_LOGO_DARK } = require('./report');
+const { fetchReport, resolveLogo, organizationsOf, JANIS_LOGO, JANIS_LOGO_DARK } = require('./report');
 const group = require('./group');
 
 // Módulo "Reporte de tickets de los últimos 3 meses" (spec §1-§8).
@@ -20,7 +20,8 @@ function defaultConfig() {
 
 // Normaliza y valida la config del módulo. `checkRemote` = validar contra
 // Jira y descargar el logo (se hace al guardar; la vista previa lo tolera).
-async function validateConfig(input = {}, { organization, checkRemote = true } = {}) {
+// organizations: [{ id, name, logoUrl }] (la primera es la principal).
+async function validateConfig(input = {}, { organizations = [], checkRemote = true } = {}) {
   const errors = [];
   const warnings = [];
   const config = {
@@ -35,17 +36,20 @@ async function validateConfig(input = {}, { organization, checkRemote = true } =
     if (!filtersByOrganization(config.jql)) {
       warnings.push('El JQL no filtra por Organization: el reporte incluiría tickets de todos los clientes del proyecto');
     }
-    if (checkRemote && organization) {
-      const jiraError = await validateJql(resolveJql(config.jql, organization.name));
+    if (checkRemote && organizations.length) {
+      const jiraError = await validateJql(resolveJql(config.jql, organizations.map((o) => o.name)));
       if (jiraError) errors.push(`Jira rechazó el JQL: ${jiraError}`);
     }
   }
 
-  if (config.logoUrl && checkRemote) {
-    try {
-      await fetchLogo(config.logoUrl);
-    } catch (error) {
-      errors.push(`Logo URL: ${error.message}`);
+  if (checkRemote) {
+    for (const organization of organizations) {
+      if (!organization.logoUrl) continue;
+      try {
+        await fetchLogo(organization.logoUrl);
+      } catch (error) {
+        errors.push(`Logo URL de ${organization.name}: ${error.message}`);
+      }
     }
   }
 
@@ -60,9 +64,11 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
   const { title, cutoffDate, language, report } = snapshot;
   const tx = t(language);
 
-  const { buffer, contentType } = await resolveLogo(snapshot.logoUrl, warnings);
+  // Un logo por Organization (snapshots anteriores: solo logoUrl). Sin logo
+  // propio se usa el isotipo de Janis, una sola vez como adjunto.
+  const logoUrls = snapshot.organizations ? snapshot.organizations.map((o) => o.logoUrl) : [snapshot.logoUrl];
+  const logos = await Promise.all(logoUrls.map((url) => resolveLogo(url, warnings)));
   const images = [
-    { cid: 'logo@caresubscription', name: 'logo', buffer, contentType },
     { cid: 'footer@caresubscription', name: 'janis-commerce.png', buffer: JANIS_LOGO, contentType: 'image/png' },
     { cid: 'footer-dark@caresubscription', name: 'janis-commerce-dark.png', buffer: JANIS_LOGO_DARK, contentType: 'image/png' },
   ];
@@ -72,6 +78,12 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
       { cid: 'chart-dark@caresubscription', name: 'distribucion-oscuro.png', buffer: renderDonutPng(report.segments, report.total, tx.donutCenter, 'dark'), contentType: 'image/png' },
     );
   }
+
+  const logoCids = logos.map((logo, i) => {
+    const cid = logo.fallback ? 'logo-janis@caresubscription' : `logo-${i}@caresubscription`;
+    if (!images.some((img) => img.cid === cid)) images.push({ cid, name: logo.fallback ? 'janis-iso.png' : `logo-${i}`, buffer: logo.buffer, contentType: logo.contentType });
+    return cid;
+  });
 
   const src = (cid) => {
     const image = images.find((i) => i.cid === cid);
@@ -86,7 +98,7 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
     report,
     browseUrl,
     images: {
-      logo: src('logo@caresubscription'),
+      logos: logoCids.map(src),
       footer: src('footer@caresubscription'),
       footerDark: src('footer-dark@caresubscription'),
       chart: src('chart@caresubscription'),
@@ -124,6 +136,7 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
     cutoffDate: formatDate(now, subscription.schedule.timezone, language),
     language,
     logoUrl: subscription.config.logoUrl || '',
+    organizations: organizationsOf(subscription).map(({ name, logoUrl }) => ({ name, logoUrl: logoUrl || '' })),
     report,
   };
 

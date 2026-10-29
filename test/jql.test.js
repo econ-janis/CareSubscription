@@ -33,3 +33,10 @@ test('sin {organization} el JQL queda igual', () => {
   const jql = 'project = JCS AND Organizations = "Carrefour - Argentina"';
   assert.equal(resolveJql(jql, 'Otra Organization'), jql);
 });
+
+test('varias Organizations: {organizations} -> lista para IN, {organization} -> la primera', () => {
+  assert.equal(resolveJql('Organizations in {organizations}', ['TATA Uruguay', 'Vierci "PY"']), 'Organizations in ("TATA Uruguay", "Vierci \\"PY\\"")');
+  assert.equal(resolveJql('Organizations = {organization}', ['A', 'B']), 'Organizations = "A"');
+  assert.equal(resolveJql('Organizations in {organizations}', 'Sola'), 'Organizations in ("Sola")');
+  assert.equal(hasPlaceholder('Organizations in {organizations}'), true);
+});

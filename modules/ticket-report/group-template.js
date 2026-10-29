@@ -76,11 +76,16 @@ function openTicketsCard(report, tx, browseUrl) {
   return `${h3(tx.openTickets)}${table(`<tr>${th(tx.key)}${th(tx.summary)}${th(tx.status, 'right')}</tr>${rows}`)}`;
 }
 
+// Logos de la sección (varias Organizations) o el único logo (formato anterior).
+function logosOf(section) {
+  return section.logos || [section.logo];
+}
+
 function messageCard(message) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;"><tr><td style="${CARD}"><span style="color:${C.muted};">${esc(message)}</span></td></tr></table>`;
 }
 
-// section: { slug, name, subscriptionTitle, logo, chart, report | null }
+// section: { slug, name, subscriptionTitle, logos: [src], chart, report | null }
 function sectionHtml(section, tx, gx, browseUrl) {
   let body;
   if (!section.report) {
@@ -104,7 +109,7 @@ function sectionHtml(section, tx, gx, browseUrl) {
 <a name="${esc(anchor)}" id="${esc(anchor)}"></a>
 <div style="height:6px;line-height:6px;font-size:0;border-radius:999px;background:${C.separator};margin:0 0 20px;">&nbsp;</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;border-collapse:collapse;"><tr>
-  <td style="vertical-align:middle;padding:0 10px 0 0;"><img src="${esc(section.logo)}" height="28" alt="" style="display:block;height:28px;width:auto;border:0;"></td>
+  <td style="vertical-align:middle;padding:0 10px 0 0;white-space:nowrap;">${logosOf(section).map((src, i) => `<img src="${esc(src)}" height="28" alt="" style="display:inline-block;vertical-align:middle;height:28px;width:auto;border:0;${i ? 'margin-left:6px;' : ''}">`).join('')}</td>
   <td style="vertical-align:middle;"><h2 style="margin:0;${text(18, 'font-weight:700;')}">${esc(section.subscriptionTitle)}</h2></td>
 </tr></table>
 ${body}
@@ -117,7 +122,7 @@ function renderGroupHtml({ title, cutoffDate, language = 'es', sections, images,
   const tx = t(language);
   const gx = TEXTS[language] || TEXTS.es;
 
-  const bullets = sections.map((s) => `<a href="#org-${esc(s.slug)}" style="display:inline-block;margin:0 8px 8px 0;background:${C.card};border:1px solid ${C.border};border-radius:999px;padding:6px 14px 6px 10px;font-family:${FONT};font-size:14px;line-height:20px;font-weight:600;color:${C.link};text-decoration:none;white-space:nowrap;"><img src="${esc(s.logo)}" height="20" alt="" style="display:inline-block;vertical-align:middle;height:20px;width:auto;border:0;margin-right:8px;">${esc(s.name)}</a>`).join('');
+  const bullets = sections.map((s) => `<a href="#org-${esc(s.slug)}" style="display:inline-block;margin:0 8px 8px 0;background:${C.card};border:1px solid ${C.border};border-radius:999px;padding:6px 14px 6px 10px;font-family:${FONT};font-size:14px;line-height:20px;font-weight:600;color:${C.link};text-decoration:none;white-space:nowrap;">${logosOf(s).map((src) => `<img src="${esc(src)}" height="20" alt="" style="display:inline-block;vertical-align:middle;height:20px;width:auto;border:0;margin-right:8px;">`).join('')}${esc(s.name)}</a>`).join('');
 
   const webLink = mode === 'email' && webUrl
     ? `<tr><td style="padding:0 0 16px;${text(12)}"><a href="${esc(webUrl)}" target="_blank" style="color:${C.link};">${esc(gx.web)}</a></td></tr>`

@@ -16,10 +16,17 @@ const JANIS_LOGO_DARK = fs.readFileSync(path.join(BRAND_DIR, 'janis-logo-dark.pn
 // correo no lo muestra).
 const FIELDS = ['summary', 'status', 'created', 'assignee'];
 
+// Organizations de la suscripción [{ id, name, logoUrl }]; las anteriores a
+// "varias Organizations" solo tienen organization + config.logoUrl.
+function organizationsOf(subscription) {
+  if (Array.isArray(subscription.organizations) && subscription.organizations.length) return subscription.organizations;
+  return [{ ...subscription.organization, logoUrl: (subscription.config && subscription.config.logoUrl) || '' }];
+}
+
 // Consulta Jira con el JQL de la suscripción y devuelve el reporte en la
 // forma que se guarda en el snapshot (lo mínimo que muestra el correo).
 async function fetchReport(subscription, language, warnings) {
-  const jql = resolveJql(subscription.config.jql, subscription.organization.name);
+  const jql = resolveJql(subscription.config.jql, organizationsOf(subscription).map((o) => o.name));
   const issues = await searchAll(jql, FIELDS);
   const report = aggregate(issues, loadStatusConfig(), language, {
     onUnknownStatus: (name) => {
@@ -49,4 +56,4 @@ async function resolveLogo(logoUrl, warnings) {
   return { buffer: JANIS_ISO, contentType: 'image/png', fallback: true };
 }
 
-module.exports = { fetchReport, resolveLogo, FIELDS, JANIS_ISO, JANIS_LOGO, JANIS_LOGO_DARK };
+module.exports = { fetchReport, resolveLogo, organizationsOf, FIELDS, JANIS_ISO, JANIS_LOGO, JANIS_LOGO_DARK };

@@ -126,7 +126,7 @@ function renderReportHtml({ title, cutoffDate, language = 'es', report, images, 
   .cs-col-2 { margin-top: 16px !important; }
 }
 @media only screen and (max-width: 680px) {
-  .cs-hdr-logo { display: block !important; margin: 0 0 16px !important; width: 32px !important; }
+  .cs-hdr-logo { display: block !important; margin: 0 0 16px !important; width: auto !important; }
 }
 @media (prefers-color-scheme: dark) {
   .cs-bg { background: #14161B !important; }
@@ -144,7 +144,7 @@ function renderReportHtml({ title, cutoffDate, language = 'es', report, images, 
 <tr><td align="center" style="padding:24px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:1180px;table-layout:fixed;">
 <tr><td style="padding:0 0 4px;font-size:0;line-height:0;">
-  <span class="cs-hdr-logo" style="display:inline-block;vertical-align:middle;margin-right:16px;"><img src="${esc(images.logo)}" height="30" alt="" style="display:block;height:30px;width:auto;border:0;"></span><h1 class="cs-tx" style="display:inline-block;vertical-align:middle;margin:0;font-family:${FONT};font-size:22px;font-weight:700;line-height:1.45;color:${C.text};">${esc(title)}</h1>
+  <span class="cs-hdr-logo" style="display:inline-block;vertical-align:middle;margin-right:16px;">${(images.logos || [images.logo]).map((src, i) => `<img src="${esc(src)}" height="30" alt="" style="display:inline-block;vertical-align:middle;height:30px;width:auto;border:0;${i ? 'margin-left:8px;' : ''}">`).join('')}</span><h1 class="cs-tx" style="display:inline-block;vertical-align:middle;margin:0;font-family:${FONT};font-size:22px;font-weight:700;line-height:1.45;color:${C.text};">${esc(title)}</h1>
 </td></tr>
 <tr><td class="cs-mut" style="padding:0 0 20px;font-family:${FONT};font-size:14px;line-height:1.45;color:${C.muted};">${esc(tx.subtitle(cutoffDate))}</td></tr>
 ${content}
