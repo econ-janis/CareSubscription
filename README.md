@@ -5,7 +5,7 @@ El repo está organizado en **módulos** (apartados); cada uno tiene su configur
 
 | Módulo | Estado | Descripción |
 |---|---|---|
-| `ticket-report` | ✅ | Reporte por correo del estado de los tickets de JSM de una Organization (últimos 3 meses): dona por estado, detalle por estado y tickets abiertos. |
+| `ticket-report` | ✅ | Reporte por correo del estado de los tickets de JSM de una Organization (últimos 3 meses): dona por estado, detalle por estado y tickets abiertos. Incluye **envío agrupado**: varias Organizations en un solo correo. |
 
 ## Arquitectura
 
@@ -84,6 +84,22 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
    - Cargar `SMTP_*`, `MAIL_FROM` y `CRON_SECRET` en Vercel.
    - Cargar los secrets `DISPATCH_URL` (`https://<deploy>/api/dispatch`) y `CRON_SECRET` en GitHub, para el workflow horario.
 5. Tests: `npm install && npm test`.
+
+## Envío agrupado (spec §10)
+
+Un solo correo con la información de varias suscripciones, una sección por Organization. Replica la maqueta `care-weekly-status-agrupado-ejemplo.html`.
+
+- **Modelo:** la entidad `group_sends` tiene título, destinatarios, frecuencia, idioma y suscripciones incluidas. Cada suscripción conserva su título, logo, JQL y Organization. Una suscripción **pausada** no se envía sola, pero sigue incluida en los agrupados.
+- **Solo destinatarios internos:** se aceptan solo direcciones de `INTERNAL_DOMAIN` (por defecto `janiscommerce.com`), sin importar los dominios permitidos de cada cliente. Se valida al guardar, al enviar y en las pruebas.
+- **Correo:** tiene, en este orden:
+  - un header con el isotipo, el título, el subtítulo y **"Ver en la web ↗"**;
+  - un bullet en forma de pill por Organization, con su logo y nombre, enlazado a `#org-<slug>`;
+  - por cada Organization, una sección con la barra separadora, su logo y título, la dona, el detalle, los tickets abiertos y "↑ Volver arriba".
+
+  El orden es alfabético por Organization. Las imágenes van por CID, sin base64 en el HTML. Si el HTML supera ~100 KB, se avisa en el historial, porque Gmail podría recortarlo.
+- **Landing:** `/reportes/<id>/<fecha>` (`?h=<historyId>` para un envío puntual) muestra la copia guardada en el historial. Requiere sesión: sin sesión, pide la clave y vuelve a la landing. La URL base sale de `APP_URL` o, si no está, de `VERCEL_PROJECT_PRODUCTION_URL`.
+- **Si falla una Organization:** el correo sale igual y su sección dice "No se pudo obtener la información". Si fallan todas, no se envía y se reintenta en la corrida siguiente.
+- **Historial:** un registro por envío (`send_history.group_id`), con el detalle por Organization. El dispatcher horario despacha suscripciones y envíos agrupados.
 
 ## Preaviso en Slack
 

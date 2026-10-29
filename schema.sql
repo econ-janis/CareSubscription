@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 
 CREATE TABLE IF NOT EXISTS send_history (
   id SERIAL PRIMARY KEY,
-  subscription_id INTEGER NOT NULL,
+  subscription_id INTEGER,                    -- envío de una suscripción…
+  group_id INTEGER,                           -- …o de un envío agrupado (spec §10)
   kind TEXT NOT NULL,                         -- 'scheduled' | 'test'
   sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   slot_at TIMESTAMPTZ,
@@ -40,9 +41,32 @@ CREATE TABLE IF NOT EXISTS send_history (
   result TEXT NOT NULL,                       -- 'ok' | 'error' | 'skipped'
   error TEXT NOT NULL DEFAULT '',
   warnings TEXT[] NOT NULL DEFAULT '{}',
-  triggered_by TEXT NOT NULL DEFAULT ''
+  triggered_by TEXT NOT NULL DEFAULT '',
+  snapshot JSONB                              -- copia mínima para "Ver correo" / landing (se borra a los 90 días)
 );
 CREATE INDEX IF NOT EXISTS send_history_subscription_idx ON send_history (subscription_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS send_history_group_idx ON send_history (group_id, sent_at DESC);
+
+-- Envíos agrupados (spec §10): varias suscripciones en un solo correo,
+-- solo a destinatarios internos.
+CREATE TABLE IF NOT EXISTS group_sends (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  recipients TEXT[] NOT NULL DEFAULT '{}',
+  subject TEXT NOT NULL DEFAULT '',
+  schedule JSONB NOT NULL,
+  language TEXT NOT NULL DEFAULT 'es',
+  subscription_ids INTEGER[] NOT NULL DEFAULT '{}',
+  active BOOLEAN NOT NULL DEFAULT true,
+  status TEXT NOT NULL DEFAULT 'ok',
+  last_error TEXT NOT NULL DEFAULT '',
+  last_slot_at TIMESTAMPTZ,
+  lock_until TIMESTAMPTZ,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id SERIAL PRIMARY KEY,

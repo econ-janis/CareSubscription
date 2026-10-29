@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Reporte · CareSubscription</title>
+<link rel="icon" href="/brand/iso-color.svg">
+<style>
+  body { margin: 0; background: #F4F6F9; color: #001233; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  .box { max-width: 520px; margin: 18vh auto; padding: 24px; background: #fff; border: 1px solid #E3E6EB; border-radius: 16px; text-align: center; }
+  .box img { height: 36px; margin-bottom: 12px; }
+  a { color: #2979FF; }
+</style>
+</head>
+<body>
+<!-- Landing de un envío agrupado (spec §10.3): /reportes/<id>/<fecha>.
+     Muestra la copia guardada en el historial; requiere sesión (si no hay,
+     va al login y vuelve). Nunca pública. -->
+<div class="box" id="box"><img src="/brand/iso-color.svg" alt=""><div id="msg">Cargando reporte…</div></div>
+<script>
+(async () => {
+  const msg = (html) => { document.getElementById('msg').innerHTML = html; };
+  const match = location.pathname.match(/^\/reportes\/(\d+)\/(\d{4}-\d{2}-\d{2})\/?$/);
+  if (!match) { msg('Dirección de reporte inválida. <a href="/">Ir a CareSubscription</a>'); return; }
+
+  const params = new URLSearchParams(location.search);
+  const query = new URLSearchParams({ id: match[1], view: 'landing', date: match[2] });
+  if (params.get('h')) query.set('h', params.get('h'));
+
+  let response;
+  try {
+    response = await fetch(`/api/groups?${query}`, { credentials: 'same-origin' });
+  } catch {
+    msg('No se pudo conectar. Reintentá en unos segundos.');
+    return;
+  }
+  if (response.status === 401) {
+    location.replace(`/?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+    return;
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const text = String(payload.error || `Error ${response.status}`).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    msg(`${text}<br><br><a href="/">Ir a CareSubscription</a>`);
+    return;
+  }
+
+  // El reporte es un documento completo (el mismo HTML del correo, con las
+  // imágenes embebidas): reemplaza esta página, así las anclas #org-… andan.
+  const hash = location.hash;
+  document.open();
+  document.write(payload.html);
+  document.close();
+  if (hash) {
+    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (target) target.scrollIntoView();
+  }
+})();
+</script>
+</body>
+</html>

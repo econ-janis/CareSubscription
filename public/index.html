@@ -38,6 +38,11 @@
   button:disabled { opacity: .5; cursor: progress; }
   .icon-btn { padding: 6px 10px; }
   .slack-btn { margin-top: 6px; padding: 4px 10px; font-size: 12px; }
+  .sub-picker { max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: 6px; }
+  .sub-picker label { display: flex; align-items: center; gap: 10px; margin: 0; padding: 6px 8px; border-radius: 10px; font-weight: 500; cursor: pointer; }
+  .sub-picker label:hover { background: var(--bg); }
+  .sub-picker .org-logo, .org-logos .org-logo { width: 28px; height: 28px; flex: 0 0 28px; padding: 2px; border-radius: 8px; }
+  .org-logos { display: flex; gap: 4px; flex-wrap: wrap; max-width: 220px; }
   table.list { width: 100%; border-collapse: collapse; }
   table.list th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--muted); padding: 8px; border-bottom: 2px solid var(--border); }
   table.list td { padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -123,6 +128,22 @@
         <tbody id="listBody"><tr><td colspan="8" class="muted">Cargando…</td></tr></tbody>
       </table>
     </div>
+
+    <div class="row" style="margin:32px 0 16px;">
+      <div>
+        <h2>Envíos agrupados</h2>
+        <div class="muted">Varias suscripciones en un solo correo, solo para destinatarios internos (@janiscommerce.com).</div>
+      </div>
+      <span class="spacer"></span>
+      <button class="primary" id="newGroupBtn">+ Nuevo envío agrupado</button>
+    </div>
+    <div id="groupMsg"></div>
+    <div class="card table-wrap">
+      <table class="list">
+        <thead><tr><th>Título</th><th>Organizations</th><th>Frecuencia</th><th>Envíos</th><th>Destinatarios</th><th>Estado</th><th>Última modificación</th><th></th></tr></thead>
+        <tbody id="groupBody"><tr><td colspan="8" class="muted">Cargando…</td></tr></tbody>
+      </table>
+    </div>
   </section>
 </main>
 
@@ -199,13 +220,70 @@
   </form>
 </dialog>
 
+<!-- Envío agrupado -->
+<dialog id="groupDlg">
+  <form id="groupForm" novalidate>
+    <div class="dlg-head"><h3 id="groupFormTitle">Nuevo envío agrupado</h3><button type="button" class="icon-btn" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div id="groupFormMsg"></div>
+      <label for="g-name">Título <span class="req">*</span></label>
+      <input type="text" id="g-name" maxlength="200" placeholder="Care Weekly Status — Clientes con PMC">
+
+      <label>Suscripciones incluidas <span class="req">*</span> <span class="muted">(una sección por Organization, en orden alfabético)</span></label>
+      <div id="g-subs" class="sub-picker"></div>
+
+      <label for="g-recipients">Destinatarios <span class="req">*</span> <span class="muted">(solo @janiscommerce.com: el correo tiene datos de varios clientes)</span></label>
+      <textarea id="g-recipients" style="min-height:70px;font-family:inherit;font-size:13px;" spellcheck="false"></textarea>
+
+      <div class="grid">
+        <div>
+          <label for="g-subject">Asunto del correo <span class="muted">(opcional · por defecto: el Título)</span></label>
+          <input type="text" id="g-subject" maxlength="250">
+        </div>
+        <div>
+          <label for="g-lang">Idioma <span class="req">*</span></label>
+          <select id="g-lang"><option value="es">Español</option><option value="pt">Português</option></select>
+        </div>
+      </div>
+
+      <label>Frecuencia <span class="req">*</span></label>
+      <div class="days" id="g-days"></div>
+      <div class="grid">
+        <div><label for="g-time">Hora</label><input type="time" id="g-time" value="09:00"></div>
+        <div><label for="g-tz">Zona horaria</label><select id="g-tz"></select></div>
+      </div>
+      <label class="check"><input type="checkbox" id="g-active" checked> Activo</label>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="groupPreviewBtn">Vista previa</button>
+      <button type="button" id="groupTestBtn">Enviar prueba</button>
+      <span class="spacer"></span>
+      <button type="button" class="danger hidden" id="groupDeleteBtn">Eliminar</button>
+      <button type="button" data-close>Cancelar</button>
+      <button type="submit" class="primary" id="groupSaveBtn">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="groupHistoryDlg">
+  <div class="dlg-head"><h3 id="groupHistoryTitle">Historial</h3><button type="button" class="icon-btn" data-close>✕</button></div>
+  <div class="dlg-body">
+    <div id="groupHistoryNext"></div>
+    <h4>Envíos</h4>
+    <div class="table-wrap"><table class="list"><thead><tr><th>Fecha</th><th>Tipo</th><th>Tickets</th><th>Organizations</th><th>Destinatarios</th><th>Envío</th><th>Vista</th></tr></thead><tbody id="groupHistoryBody"></tbody></table></div>
+    <div class="muted" id="groupHistoryRetention" style="margin-top:6px;"></div>
+    <h4 style="margin-top:24px;">Auditoría</h4>
+    <div class="table-wrap"><table class="list"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Campos</th></tr></thead><tbody id="groupAuditBody"></tbody></table></div>
+  </div>
+</dialog>
+
 <dialog id="testDlg" style="width:min(460px, calc(100vw - 32px));">
   <form id="testForm" novalidate>
     <div class="dlg-head"><h3>Enviar prueba</h3><button type="button" class="icon-btn" data-close>✕</button></div>
     <div class="dlg-body">
       <label for="t-email">¿A qué correo querés que llegue?</label>
       <input type="text" id="t-email" inputmode="email" autocomplete="email">
-      <div class="muted" style="margin-top:6px;">Un solo correo, de un dominio permitido para esta Organization. Se envía el reporte con los datos actuales; no se guarda la suscripción.</div>
+      <div class="muted" style="margin-top:6px;" id="testHint">Un solo correo, de un dominio permitido para esta Organization. Se envía el reporte con los datos actuales; no se guarda la suscripción.</div>
       <div id="testMsg"></div>
     </div>
     <div class="dlg-foot">
@@ -340,7 +418,17 @@
     $('mailBanner').classList.toggle('hidden', state.mailEnabled);
     $('testBtn').disabled = !state.mailEnabled;
     $('testBtn').title = state.mailEnabled ? '' : 'El envío de correo todavía no está configurado';
+    $('groupTestBtn').disabled = !state.mailEnabled;
+    $('groupTestBtn').title = $('testBtn').title;
+    // Si vino de la landing de un envío agrupado, volver ahí después del login.
+    const next = new URLSearchParams(location.search).get('next') || '';
+    if (/^\/reportes\/\d+\/\d{4}-\d{2}-\d{2}/.test(next)) {
+      location.replace(next);
+      return;
+    }
+    // Los agrupados muestran los logos de sus suscripciones: cargar después.
     await loadList();
+    await loadGroups();
   }
 
   // ---- Lista ----
@@ -585,24 +673,32 @@
   });
 
   // Pregunta a qué correo enviar la prueba (por defecto, el del usuario).
+  // El mismo cuadro sirve para suscripciones y envíos agrupados (testTarget).
   let lastTestRecipient = '';
-  $('testBtn').onclick = () => {
-    clearMsg('formMsg');
+  function openTestDialog(target) {
+    state.testTarget = target;
+    clearMsg(target.msg);
     clearMsg('testMsg');
+    $('testHint').textContent = target.hint;
     $('t-email').value = lastTestRecipient || state.user.email;
     $('testDlg').showModal();
     $('t-email').select();
-  };
+  }
+  $('testBtn').onclick = () => openTestDialog({
+    url: '/api/subscriptions?action=test', payload: formPayload, msg: 'formMsg',
+    hint: 'Un solo correo, de un dominio permitido para esta Organization. Se envía el reporte con los datos actuales; no se guarda la suscripción.',
+  });
 
   $('testForm').onsubmit = (event) => {
     event.preventDefault();
     busy($('testSendBtn'), async () => {
       clearMsg('testMsg');
       try {
-        const { sentTo } = await api('/api/subscriptions?action=test', { method: 'POST', body: { ...formPayload(), testRecipient: $('t-email').value.trim() } });
+        const target = state.testTarget;
+        const { sentTo } = await api(target.url, { method: 'POST', body: { ...target.payload(), testRecipient: $('t-email').value.trim() } });
         lastTestRecipient = sentTo;
         $('testDlg').close();
-        showMsg('formMsg', 'ok', `Prueba enviada solo a ${sentTo}.`);
+        showMsg(target.msg, 'ok', `Prueba enviada solo a ${sentTo}.`);
       } catch (error) {
         errorMsg('testMsg', error);
       }
@@ -664,6 +760,181 @@
         showMsg('historyNext', 'err', error.message);
       }
     });
+  }
+
+  // ---- Envíos agrupados (spec §10) ----
+  $('g-days').innerHTML = [1, 2, 3, 4, 5, 6, 0].map((d) => `<label><input type="checkbox" value="${d}"><span>${DAY_NAMES[d]}</span></label>`).join('');
+  $('g-tz').innerHTML = zones.map((z) => `<option>${esc(z)}</option>`).join('');
+
+  function subscriptionById(id) {
+    return state.subscriptions.find((s) => s.id === id);
+  }
+
+  async function loadGroups() {
+    try {
+      const { groups } = await api('/api/groups');
+      state.groups = groups;
+      clearMsg('groupMsg');
+      renderGroups();
+    } catch (error) {
+      errorMsg('groupMsg', error);
+    }
+  }
+
+  function renderGroups() {
+    const body = $('groupBody');
+    const groups = state.groups || [];
+    if (!groups.length) {
+      body.innerHTML = '<tr><td colspan="8" class="muted">Todavía no hay envíos agrupados.</td></tr>';
+      return;
+    }
+    body.innerHTML = groups.map((g) => {
+      const subs = g.subscriptionIds.map(subscriptionById).filter(Boolean)
+        .sort((a, b) => a.organization.name.localeCompare(b.organization.name, 'es'));
+      return `<tr>
+      <td><strong>${esc(g.name)}</strong></td>
+      <td><div class="org-logos">${subs.map((s) => `<span title="${esc(s.organization.name)}">${orgLogo(s)}</span>`).join('') || '<span class="muted">—</span>'}</div></td>
+      <td>${scheduleText(g.schedule)}</td>
+      <td style="white-space:nowrap;">${sendsText(g)}</td>
+      <td>${g.recipients.length}</td>
+      <td>${statusPill(g)}${g.status === 'error' ? `<div class="muted" style="color:var(--danger);max-width:240px;">${esc(g.lastError)}</div>` : ''}</td>
+      <td>${fmtDateTime(g.updatedAt)}<div class="muted">${esc(g.updatedBy)}</div></td>
+      <td style="white-space:nowrap;"><button class="link" data-gedit="${g.id}">Editar</button><button class="link" data-ghistory="${g.id}">Historial</button></td>
+    </tr>`;
+    }).join('');
+    body.querySelectorAll('[data-gedit]').forEach((b) => { b.onclick = () => openGroupForm(groups.find((g) => g.id === Number(b.dataset.gedit))); });
+    body.querySelectorAll('[data-ghistory]').forEach((b) => { b.onclick = () => openGroupHistory(groups.find((g) => g.id === Number(b.dataset.ghistory))); });
+  }
+
+  function renderSubscriptionPicker(selected) {
+    const subs = [...state.subscriptions].sort((a, b) => a.organization.name.localeCompare(b.organization.name, 'es') || a.title.localeCompare(b.title, 'es'));
+    $('g-subs').innerHTML = subs.length
+      ? subs.map((s) => `<label><input type="checkbox" value="${s.id}" ${selected.includes(s.id) ? 'checked' : ''}>${orgLogo(s)}<span><strong>${esc(s.organization.name)}</strong><div class="muted">${esc(s.title)}${s.active ? '' : ' · pausada (solo se envía en agrupados)'}</div></span></label>`).join('')
+      : '<div class="muted" style="padding:8px;">Primero creá suscripciones por Organization.</div>';
+  }
+
+  function openGroupForm(group) {
+    state.editingGroup = group || null;
+    const g = group || { name: '', recipients: [state.user.email], subject: '', schedule: { days: [1], time: '09:00', timezone: DEFAULT_TZ }, language: 'es', subscriptionIds: [], active: true };
+    $('groupFormTitle').textContent = group ? 'Editar envío agrupado' : 'Nuevo envío agrupado';
+    $('g-name').value = g.name;
+    $('g-recipients').value = g.recipients.join('\n');
+    $('g-subject').value = g.subject;
+    $('g-lang').value = g.language;
+    $('g-time').value = g.schedule.time;
+    $('g-tz').value = g.schedule.timezone;
+    $('g-active').checked = g.active;
+    $('g-days').querySelectorAll('input').forEach((i) => { i.checked = g.schedule.days.includes(Number(i.value)); });
+    renderSubscriptionPicker(g.subscriptionIds);
+    $('groupDeleteBtn').classList.toggle('hidden', !group);
+    clearMsg('groupFormMsg');
+    $('groupDlg').showModal();
+  }
+  $('newGroupBtn').onclick = () => openGroupForm(null);
+
+  function groupPayload() {
+    return {
+      id: state.editingGroup ? state.editingGroup.id : undefined,
+      name: $('g-name').value,
+      subscriptionIds: [...$('g-subs').querySelectorAll('input:checked')].map((i) => Number(i.value)),
+      recipients: $('g-recipients').value,
+      subject: $('g-subject').value,
+      language: $('g-lang').value,
+      schedule: {
+        days: [...$('g-days').querySelectorAll('input:checked')].map((i) => Number(i.value)),
+        time: $('g-time').value,
+        timezone: $('g-tz').value,
+      },
+      active: $('g-active').checked,
+    };
+  }
+
+  $('groupForm').onsubmit = (event) => {
+    event.preventDefault();
+    busy($('groupSaveBtn'), async () => {
+      clearMsg('groupFormMsg');
+      try {
+        const payload = groupPayload();
+        state.editingGroup
+          ? await api(`/api/groups?id=${state.editingGroup.id}`, { method: 'PUT', body: payload })
+          : await api('/api/groups', { method: 'POST', body: payload });
+        $('groupDlg').close();
+        await loadGroups();
+        showMsg('groupMsg', 'ok', 'Envío agrupado guardado.');
+      } catch (error) {
+        errorMsg('groupFormMsg', error);
+        $('groupDlg').querySelector('.dlg-body').scrollTop = 0;
+      }
+    });
+  };
+
+  $('groupDeleteBtn').onclick = () => {
+    if (!state.editingGroup || !confirm(`¿Eliminar el envío agrupado "${state.editingGroup.name}"? Las suscripciones incluidas no se borran.`)) return;
+    busy($('groupDeleteBtn'), async () => {
+      try {
+        await api(`/api/groups?id=${state.editingGroup.id}`, { method: 'DELETE' });
+        $('groupDlg').close();
+        await loadGroups();
+        showMsg('groupMsg', 'ok', 'Envío agrupado eliminado.');
+      } catch (error) {
+        errorMsg('groupFormMsg', error);
+      }
+    });
+  };
+
+  $('groupPreviewBtn').onclick = () => busy($('groupPreviewBtn'), async () => {
+    clearMsg('groupFormMsg');
+    try {
+      const { subject, html, itemCount, warnings } = await api('/api/groups?action=preview', { method: 'POST', body: groupPayload() });
+      $('previewTitle').textContent = `Vista previa · ${subject}`;
+      $('previewFrame').srcdoc = html;
+      if (warnings.length) showMsg('previewMsg', 'warn', `${itemCount} tickets. Advertencias:`, warnings);
+      else showMsg('previewMsg', 'ok', `${itemCount} tickets. No se envió ningún correo.`);
+      $('previewDlg').showModal();
+    } catch (error) {
+      errorMsg('groupFormMsg', error);
+    }
+  });
+
+  $('groupTestBtn').onclick = () => openTestDialog({
+    url: '/api/groups?action=test', payload: groupPayload, msg: 'groupFormMsg',
+    hint: 'Un solo correo @janiscommerce.com (el correo tiene datos de varios clientes). No se guarda el envío agrupado.',
+  });
+
+  function landingPath(group, entry) {
+    const date = new Intl.DateTimeFormat('en-CA', { timeZone: group.schedule.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(entry.sentAt));
+    return `/reportes/${group.id}/${date}?h=${entry.id}`;
+  }
+
+  async function openGroupHistory(group) {
+    $('groupHistoryTitle').textContent = `Historial · ${group.name}`;
+    $('groupHistoryBody').innerHTML = '<tr><td colspan="7" class="muted">Cargando…</td></tr>';
+    $('groupAuditBody').innerHTML = '';
+    clearMsg('groupHistoryNext');
+    $('groupHistoryDlg').showModal();
+    try {
+      const { history, audit, nextSendAt, snapshotRetentionDays } = await api(`/api/groups?id=${group.id}&view=history`);
+      if (nextSendAt) showMsg('groupHistoryNext', 'ok', `Próximo envío programado: ${fmtInTz(nextSendAt, group.schedule.timezone)} (${group.schedule.timezone})`);
+      else showMsg('groupHistoryNext', 'warn', group.active ? 'Sin envíos programados: el envío de correo no está configurado.' : 'Envío pausado: no hay envíos programados.');
+      $('groupHistoryRetention').textContent = `La versión web de cada envío se conserva ${snapshotRetentionDays} días.`;
+
+      $('groupHistoryBody').innerHTML = history.length ? history.map((h) => `<tr>
+        <td style="white-space:nowrap;">${fmtDateTime(h.sentAt)}</td>
+        <td>${KIND[h.kind] || esc(h.kind)}${h.kind !== 'scheduled' ? `<div class="muted">${esc(h.triggeredBy)}</div>` : ''}</td>
+        <td>${h.ticketCount ?? '—'}</td>
+        <td class="muted">${h.sections.map((s) => s.ok ? `${esc(s.name)}: ${s.total}` : `<span style="color:var(--danger)">${esc(s.name)}: sin datos</span>`).join('<br>') || '—'}</td>
+        <td>${h.recipients.map(esc).join('<br>')}</td>
+        <td>${RESULT[h.result] || esc(h.result)}${h.error ? `<div class="muted">${esc(h.error)}</div>` : ''}</td>
+        <td>${h.hasSnapshot && h.result === 'ok' ? `<a class="link" href="${esc(landingPath(group, h))}" target="_blank" rel="noopener" style="white-space:nowrap;">Ver en la web ↗</a>` : '<span class="muted">—</span>'}</td>
+      </tr>`).join('') : '<tr><td colspan="7" class="muted">Sin envíos todavía.</td></tr>';
+
+      $('groupAuditBody').innerHTML = audit.length ? audit.map((a) => `<tr>
+        <td>${fmtDateTime(a.at)}</td><td>${esc(a.actor)}</td><td>${ACTION[a.action] || esc(a.action)}</td>
+        <td class="muted">${esc(Object.keys(a.changes).join(', ') || 'sin cambios')}</td>
+      </tr>`).join('') : '<tr><td colspan="4" class="muted">Sin registros.</td></tr>';
+    } catch (error) {
+      $('groupHistoryBody').innerHTML = `<tr><td colspan="7">${esc(error.message)}</td></tr>`;
+    }
   }
 
   initAuth().catch((error) => { showLogin(); showMsg('loginMsg', 'err', error.message); });

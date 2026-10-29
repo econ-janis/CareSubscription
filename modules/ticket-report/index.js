@@ -1,27 +1,18 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const { searchAll, validateJql, browseUrl } = require('../../lib/jira');
+const { validateJql, browseUrl } = require('../../lib/jira');
 const { fetchLogo } = require('../../lib/logo');
 const { formatDate } = require('../../lib/schedule');
 const { DEFAULT_JQL, resolveJql, filtersByOrganization } = require('./jql');
-const { loadStatusConfig } = require('./statuses');
-const { aggregate } = require('./aggregate');
 const { renderDonutPng } = require('./chart');
 const { renderReportHtml } = require('./template');
 const { t } = require('./i18n');
 const { buildSlackComment } = require('./slack');
+const { fetchReport, resolveLogo, JANIS_LOGO, JANIS_LOGO_DARK } = require('./report');
+const group = require('./group');
 
 // Módulo "Reporte de tickets de los últimos 3 meses" (spec §1-§8).
 // Contrato de módulo (ver modules/index.js): defaultConfig, validateConfig
 // y build. Lo genérico (programación, envío, historial, destinatarios)
 // vive en lib/ y se reutiliza para los próximos módulos.
-const BRAND_DIR = path.join(__dirname, '..', '..', 'assets', 'brand');
-const JANIS_ISO = fs.readFileSync(path.join(BRAND_DIR, 'janis-iso.png'));
-const JANIS_LOGO = fs.readFileSync(path.join(BRAND_DIR, 'janis-logo.png'));
-const JANIS_LOGO_DARK = fs.readFileSync(path.join(BRAND_DIR, 'janis-logo-dark.png'));
-// assignee: solo para agrupar por Responsable en el preaviso de Slack (el
-// correo no lo muestra).
-const FIELDS = ['summary', 'status', 'created', 'assignee'];
 
 function defaultConfig() {
   return { jql: DEFAULT_JQL, logoUrl: '', skipIfEmpty: false };
@@ -61,18 +52,6 @@ async function validateConfig(input = {}, { organization, checkRemote = true } =
   return { config, errors, warnings };
 }
 
-async function resolveLogo(logoUrl, warnings) {
-  if (logoUrl) {
-    try {
-      return await fetchLogo(logoUrl);
-    } catch (error) {
-      console.warn(`[ticket-report] logo inválido (${logoUrl}): ${error.message}`);
-      warnings.push(`Logo no disponible, se usó el isotipo de Janis: ${error.message}`);
-    }
-  }
-  return { buffer: JANIS_ISO, contentType: 'image/png' };
-}
-
 // Dibuja el correo a partir de un snapshot (los datos ya agregados, sin
 // consultar Jira). mode: 'email' (imágenes por CID) o 'preview' (imágenes
 // como data: URI para mostrar en la UI). Se usa al enviar, en la vista
@@ -81,9 +60,9 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
   const { title, cutoffDate, language, report } = snapshot;
   const tx = t(language);
 
-  const logo = await resolveLogo(snapshot.logoUrl, warnings);
+  const { buffer, contentType } = await resolveLogo(snapshot.logoUrl, warnings);
   const images = [
-    { cid: 'logo@caresubscription', name: 'logo', ...logo },
+    { cid: 'logo@caresubscription', name: 'logo', buffer, contentType },
     { cid: 'footer@caresubscription', name: 'janis-commerce.png', buffer: JANIS_LOGO, contentType: 'image/png' },
     { cid: 'footer-dark@caresubscription', name: 'janis-commerce-dark.png', buffer: JANIS_LOGO_DARK, contentType: 'image/png' },
   ];
@@ -137,16 +116,7 @@ async function render(snapshot, { mode = 'email', warnings = [] } = {}) {
 async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   const warnings = [];
   const language = subscription.language || 'es';
-  const statusConfig = loadStatusConfig();
-  const jql = resolveJql(subscription.config.jql, subscription.organization.name);
-
-  const issues = await searchAll(jql, FIELDS);
-  const report = aggregate(issues, statusConfig, language, {
-    onUnknownStatus: (name) => {
-      console.warn(`[ticket-report] estado de Jira sin mapear en config/statuses.json: "${name}" (suscripción ${subscription.id ?? 'sin guardar'})`);
-      warnings.push(`Estado sin mapear: ${name}`);
-    },
-  });
+  const report = await fetchReport(subscription, language, warnings);
 
   const snapshot = {
     title: subscription.title,
@@ -154,12 +124,7 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
     cutoffDate: formatDate(now, subscription.schedule.timezone, language),
     language,
     logoUrl: subscription.config.logoUrl || '',
-    report: {
-      total: report.total,
-      rows: report.rows,
-      segments: report.segments,
-      openTickets: report.openTickets.map(({ key, summary, status, assignee }) => ({ key, summary, status, assignee })),
-    },
+    report,
   };
 
   const rendered = await render(snapshot, { mode, warnings });
@@ -191,4 +156,7 @@ module.exports = {
   renderSnapshot,
   // Mensaje del preaviso en Slack (tickets abiertos por Responsable).
   slackComment: (snapshot, context) => buildSlackComment(snapshot, { ...context, browseUrl }),
+  // Envío agrupado (spec §10): varias suscripciones en un solo correo.
+  buildGroup: group.buildGroup,
+  renderGroupSnapshot: group.renderGroupSnapshot,
 };

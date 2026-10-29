@@ -22,6 +22,8 @@ const INNER_R = 78;
 const THEMES = {
   light: { card: '#FFFFFF', text: '#1D2330' },
   dark: { card: '#1D2027', text: '#E6E8EC' },
+  // Maqueta del envío agrupado (spec §10): texto central #001233.
+  group: { card: '#FFFFFF', text: '#001233' },
 };
 
 function escapeXml(value) {
