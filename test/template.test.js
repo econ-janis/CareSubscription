@@ -83,3 +83,9 @@ test('el correo se marca como "no traducir" (Gmail lo traducía solo)', () => {
   assert.ok(html.includes('<meta name="google" content="notranslate">'));
   assert.ok(html.includes('class="cs-bg notranslate"'));
 });
+
+test('encabezado con un logo por Organization', () => {
+  const html = renderReportHtml({ title: 'T', cutoffDate: 'x', language: 'es', report: aggregate([], config, 'es'), browseUrl, images: { ...images, logos: ['cid:logo-0', 'cid:logo-1'] } });
+  assert.ok(html.includes('src="cid:logo-0"'));
+  assert.ok(html.includes('src="cid:logo-1"'));
+});

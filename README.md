@@ -85,6 +85,17 @@ Cada suscripción define días de la semana, hora y zona horaria (por defecto `A
    - Cargar los secrets `DISPATCH_URL` (`https://<deploy>/api/dispatch`) y `CRON_SECRET` en GitHub, para el workflow horario.
 5. Tests: `npm install && npm test`.
 
+## Varias Organizations por suscripción
+
+Una suscripción puede abarcar más de una Organization, cada una con su logo. En el formulario, **+ Agregar Organization** suma una línea.
+
+- **JQL:** se usa tal cual. Comodines opcionales:
+  - `{organization}` es la primera Organization;
+  - `{organizations}` es la lista de todas, para usar con `IN`: `Organizations in {organizations}` → `("A", "B")`.
+- **Reporte:** un logo por Organization a la izquierda del título. En el envío agrupado, la sección y su bullet muestran todos los logos y los nombres unidos con " · ".
+- **Destinatarios:** se aceptan los dominios permitidos de cualquiera de las Organizations.
+- **Datos:** columna `subscriptions.organizations` (JSONB `[{ id, name, logoUrl }]`). La primera Organization también queda en `organization_id`, `organization_name` y `config.logoUrl`, para compatibilidad. Las suscripciones anteriores se leen como una sola Organization.
+
 ## Envío agrupado (spec §10)
 
 Un solo correo con la información de varias suscripciones, una sección por Organization. Replica la maqueta `care-weekly-status-agrupado-ejemplo.html`.

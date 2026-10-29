@@ -21,7 +21,7 @@ const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 //                                             por defecto el del usuario), de un dominio permitido
 // POST   /api/subscriptions?action=slack&id=N -> preaviso en Slack (SLACK_CHANNEL) de una suscripción guardada
 // (todo en un archivo para no sumar Serverless Functions al plan Hobby)
-const AUDITED_FIELDS = ['title', 'organization', 'config', 'recipients', 'subject', 'schedule', 'language', 'active'];
+const AUDITED_FIELDS = ['title', 'organization', 'organizations', 'config', 'recipients', 'subject', 'schedule', 'language', 'active'];
 
 function diff(before, after) {
   const changes = {};
@@ -60,7 +60,7 @@ async function handleAction(action, req, res, user) {
   if (action === 'test') {
     if (!isMailConfigured()) throw new HttpError(503, 'El envío de correo todavía no está configurado; por ahora solo está disponible la vista previa');
     // Mismas reglas que los destinatarios: dominio global o de la Organization.
-    const domains = data.organization ? await db.getOrganizationDomains(data.organization.id) : [];
+    const domains = await db.getOrganizationsDomains(data.organizations.map((o) => o.id));
     const { recipients, errors } = validateRecipients([body.testRecipient || user.email], domains);
     if (errors.length || recipients.length !== 1) throw new HttpError(400, errors[0] || 'Ingresá un solo correo para la prueba');
     const [testRecipient] = recipients;
