@@ -22,3 +22,12 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           curl -fsS --max-time 120 -X POST -H "Authorization: Bearer ${CRON_SECRET}" "${DISPATCH_URL}"
+      # Impacto Care: trae de Jira los tickets actualizados (métricas por ticket).
+      # Usa la misma URL base que DISPATCH_URL y el mismo CRON_SECRET.
+      - name: Sincronizar Impacto Care
+        continue-on-error: true
+        env:
+          DISPATCH_URL: ${{ secrets.DISPATCH_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsS --max-time 90 -X POST -H "Authorization: Bearer ${CRON_SECRET}" "${DISPATCH_URL%/api/dispatch}/api/impact?action=sync"

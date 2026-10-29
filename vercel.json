@@ -20,6 +20,10 @@
     "api/groups.js": {
       "maxDuration": 60,
       "includeFiles": "{assets,config}/**"
+    },
+    "api/impact.js": {
+      "maxDuration": 60,
+      "includeFiles": "{assets,config}/**"
     }
   },
   "headers": [
@@ -53,6 +57,18 @@
     {
       "source": "/api/me",
       "destination": "/api/auth?action=me"
+    },
+    {
+      "source": "/suscripciones",
+      "destination": "/suscripciones.html"
+    },
+    {
+      "source": "/clientes-pmc",
+      "destination": "/clientes-pmc.html"
+    },
+    {
+      "source": "/impacto",
+      "destination": "/impacto.html"
     },
     {
       "source": "/reportes/:id/:date",

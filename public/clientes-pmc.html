@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clientes PMC · CareSubscription</title>
+<link rel="icon" href="/brand/iso-color.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  .section-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .section-head p { margin: 4px 0 0; }
+  .progress { height: 8px; border-radius: 9999px; background: var(--grid); overflow: hidden; margin-top: 10px; }
+  .progress > div { height: 100%; background: var(--primary); border-radius: 9999px; transition: width .3s; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-weight: 600; }
+</style>
+</head>
+<body>
+<main class="stack">
+  <div>
+    <h1 class="page">Clientes PMC</h1>
+    <p class="lead">Qué Organizations de Jira son clientes PMC, su nivel y desde cuándo. Esto define a quién mide Impacto Care y con qué metas de SLA.</p>
+  </div>
+  <div id="pageMsg"></div>
+
+  <section class="card">
+    <div class="section-head">
+      <div><h2>Clientes</h2><p class="muted">El nivel define las metas de SLA de contrato. La fecha de alta permite comparar antes y después de PMC.</p></div>
+      <span class="spacer"></span>
+      <button id="suggestBtn">Buscar sugerencias en Jira</button>
+      <button class="primary" id="addClientBtn">+ Agregar cliente</button>
+    </div>
+    <div id="suggestions"></div>
+    <div class="table-wrap">
+      <table class="list">
+        <thead><tr><th>Cliente</th><th>Nivel</th><th>Alta en PMC</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="clientRows"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <div><h2>Niveles y metas de SLA (contrato)</h2><p class="muted">Horas corridas desde que se crea el ticket. Deja vacía una meta si el nivel no la tiene.</p></div>
+      <span class="spacer"></span>
+      <button class="primary" id="addLevelBtn">+ Agregar nivel</button>
+    </div>
+    <div class="table-wrap">
+      <table class="list">
+        <thead><tr><th>Nivel</th><th class="num">Primera respuesta</th><th class="num">Resolución</th><th class="num">Clientes</th><th></th></tr></thead>
+        <tbody id="levelRows"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <div><h2>Cómo se calcula</h2><p class="muted">Cambiar los agentes o los proyectos de escalamiento requiere recalcular la historia.</p></div>
+    </div>
+    <div class="grid3">
+      <div>
+        <label for="agents">Agentes de Care (primera respuesta real)</label>
+        <textarea id="agents" placeholder="Guardia, Joel, Mauricio, Erwin"></textarea>
+        <div class="muted">Separados por coma. Coincide con el nombre en Jira ("Mauricio" = "Mauricio …"). Nunca cuenta comentarios de clientes, de la automatización ni notas internas.</div>
+      </div>
+      <div>
+        <label for="escalation">Proyectos de escalamiento a desarrollo</label>
+        <input type="text" id="escalation" placeholder="HDI">
+        <div class="muted">Un ticket "se escaló" si tiene un enlace a un ticket de estos proyectos.</div>
+      </div>
+      <div>
+        <label for="timezone">Zona horaria de las semanas (lunes a domingo)</label>
+        <select id="timezone">
+          <option value="America/Argentina/Buenos_Aires">Buenos Aires</option>
+          <option value="America/Santiago">Santiago</option>
+          <option value="America/Mexico_City">Ciudad de México</option>
+          <option value="America/Sao_Paulo">São Paulo</option>
+          <option value="America/Bogota">Bogotá</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px;"><button class="primary" id="saveSettingsBtn">Guardar ajustes</button><div id="settingsMsg" style="flex:1;"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <div><h2>Datos de Jira</h2><p class="muted">Se guardan solo métricas por ticket (fechas, Organization, SLA y si se escaló), nunca textos ni personas. Se actualiza cada hora.</p></div>
+      <span class="spacer"></span>
+      <button id="resyncBtn">Recalcular todo</button>
+      <button class="primary" id="syncBtn">Sincronizar ahora</button>
+    </div>
+    <dl class="kv" id="syncInfo"></dl>
+    <div class="progress hidden" id="syncProgress"><div style="width:0"></div></div>
+    <div id="syncMsg"></div>
+  </section>
+</main>
+
+<dialog id="clientDlg">
+  <div class="dlg-head"><h3 id="clientDlgTitle">Cliente PMC</h3><button class="icon-btn" data-close aria-label="Cerrar">✕</button></div>
+  <div class="dlg-body">
+    <label for="c-org">Organization de Jira</label>
+    <input type="text" id="c-org" list="orgList" placeholder="Escribe para buscar…" autocomplete="off">
+    <datalist id="orgList"></datalist>
+    <div class="grid2">
+      <div><label for="c-level">Nivel</label><select id="c-level"></select></div>
+      <div><label for="c-since">Alta en PMC</label><input type="date" id="c-since"></div>
+    </div>
+    <label for="c-logo">Logo URL (HTTPS, PNG o JPG)</label>
+    <input type="url" id="c-logo" placeholder="https://…">
+    <label class="check"><input type="checkbox" id="c-active" checked> Activo (se incluye en Impacto Care)</label>
+    <div id="clientMsg"></div>
+  </div>
+  <div class="dlg-foot"><button data-close>Cancelar</button><button class="primary" id="saveClientBtn">Guardar</button></div>
+</dialog>
+
+<dialog id="levelDlg">
+  <div class="dlg-head"><h3>Nivel PMC</h3><button class="icon-btn" data-close aria-label="Cerrar">✕</button></div>
+  <div class="dlg-body">
+    <label for="l-name">Nombre</label>
+    <input type="text" id="l-name" placeholder="Gold">
+    <div class="grid2">
+      <div><label for="l-fr">Primera respuesta (horas)</label><input type="number" id="l-fr" min="0" step="0.5"></div>
+      <div><label for="l-res">Resolución (horas)</label><input type="number" id="l-res" min="0" step="1"></div>
+    </div>
+    <div id="levelMsg"></div>
+  </div>
+  <div class="dlg-foot"><button data-close>Cancelar</button><button class="primary" id="saveLevelBtn">Guardar</button></div>
+</dialog>
+
+<script src="/assets/app.js"></script>
+<script>
+(() => {
+  const { $, esc, api, showMsg, busy } = CS;
+  const state = { levels: [], clients: [], organizations: [], settings: null, editingLevel: null, editingClient: null };
+  const fmtH = (h) => (h === null || h === undefined ? '—' : `${h} h`);
+  const fmtDate = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+  const fmtDateTime = (d) => (d ? new Date(d).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+  document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => b.closest('dialog').close(); });
+
+  function logo(url) {
+    return url ? `<img class="org-logo" src="${esc(url)}" alt="">` : '<img class="org-logo" src="/brand/iso-color.svg" alt="">';
+  }
+
+  function renderClients() {
+    const levelName = (id) => (state.levels.find((l) => l.id === id) || {}).name;
+    $('clientRows').innerHTML = state.clients.length ? state.clients.map((c) => `<tr>
+      <td><span class="org">${logo(c.logoUrl)}${esc(c.organizationName)}</span></td>
+      <td>${levelName(c.levelId) ? `<span class="chip">${esc(levelName(c.levelId))}</span>` : '<span class="muted">Sin nivel</span>'}</td>
+      <td>${fmtDate(c.pmcSince)}</td>
+      <td>${c.active ? 'Activo' : '<span class="muted">Inactivo</span>'}</td>
+      <td style="text-align:right;white-space:nowrap;"><button class="link" data-edit-client="${esc(c.organizationId)}">Editar</button><button class="link danger" data-del-client="${esc(c.organizationId)}">Quitar</button></td>
+    </tr>`).join('') : '<tr><td colspan="5" class="muted">Todavía no hay clientes PMC. Agrégalos a mano o con "Buscar sugerencias en Jira".</td></tr>';
+    document.querySelectorAll('[data-edit-client]').forEach((b) => { b.onclick = () => openClient(state.clients.find((c) => c.organizationId === b.dataset.editClient)); });
+    document.querySelectorAll('[data-del-client]').forEach((b) => {
+      b.onclick = async () => {
+        const client = state.clients.find((c) => c.organizationId === b.dataset.delClient);
+        if (!confirm(`¿Quitar a ${client.organizationName} de los clientes PMC? Sus tickets dejan de aparecer en Impacto Care.`)) return;
+        await api(`/api/impact?view=clients&id=${encodeURIComponent(client.organizationId)}`, { method: 'DELETE' });
+        await load();
+      };
+    });
+  }
+
+  function renderLevels() {
+    $('levelRows').innerHTML = state.levels.length ? state.levels.map((l) => `<tr>
+      <td><span class="chip">${esc(l.name)}</span></td>
+      <td class="num">${fmtH(l.firstResponseHours)}</td>
+      <td class="num">${fmtH(l.resolutionHours)}</td>
+      <td class="num">${state.clients.filter((c) => c.levelId === l.id).length}</td>
+      <td style="text-align:right;white-space:nowrap;"><button class="link" data-edit-level="${l.id}">Editar</button><button class="link danger" data-del-level="${l.id}">Borrar</button></td>
+    </tr>`).join('') : '<tr><td colspan="5" class="muted">Sin niveles. Crea uno por cada nivel de PMC (ej. Gold, Silver) con sus metas.</td></tr>';
+    document.querySelectorAll('[data-edit-level]').forEach((b) => { b.onclick = () => openLevel(state.levels.find((l) => l.id === Number(b.dataset.editLevel))); });
+    document.querySelectorAll('[data-del-level]').forEach((b) => {
+      b.onclick = async () => {
+        const level = state.levels.find((l) => l.id === Number(b.dataset.delLevel));
+        if (!confirm(`¿Borrar el nivel ${level.name}? Los clientes con ese nivel quedan sin nivel.`)) return;
+        await api(`/api/impact?view=levels&id=${level.id}`, { method: 'DELETE' });
+        await load();
+      };
+    });
+  }
+
+  function renderSettings() {
+    const s = state.settings;
+    $('agents').value = s.agents.join(', ');
+    $('escalation').value = s.escalationProjects.join(', ');
+    if (![...$('timezone').options].some((o) => o.value === s.timezone)) $('timezone').add(new Option(s.timezone, s.timezone));
+    $('timezone').value = s.timezone;
+  }
+
+  function renderSync(sync) {
+    const st = sync.state || {};
+    const phase = !st.phase ? 'Sin sincronizar' : st.phase === 'backfill' ? 'Cargando historia (2 años)…' : 'Al día';
+    $('syncInfo').innerHTML = `
+      <dt>Estado</dt><dd>${esc(phase)}</dd>
+      <dt>Tickets guardados</dt><dd>${(sync.facts.total || 0).toLocaleString('es-AR')}</dd>
+      <dt>Desde</dt><dd>${sync.facts.oldest ? fmtDate(String(sync.facts.oldest).slice(0, 10)) : '—'}</dd>
+      <dt>Última sincronización</dt><dd>${fmtDateTime(st.lastRunAt)}</dd>`;
+    if (st.phase === 'backfill' && st.cursor) {
+      const start = Date.now() - 730 * 86400000;
+      const done = Math.min(1, (new Date(st.cursor) - start) / (Date.now() - start));
+      $('syncProgress').classList.remove('hidden');
+      $('syncProgress').firstElementChild.style.width = `${Math.round(done * 100)}%`;
+    } else {
+      $('syncProgress').classList.add('hidden');
+    }
+  }
+
+  async function load() {
+    const config = await api('/api/impact?view=config');
+    Object.assign(state, config);
+    renderClients();
+    renderLevels();
+    renderSettings();
+    renderSync(config.sync);
+  }
+
+  async function loadOrganizations() {
+    if (state.organizations.length) return;
+    const { organizations } = await api('/api/organizations');
+    state.organizations = organizations;
+    $('orgList').innerHTML = organizations.map((o) => `<option value="${esc(o.name)}"></option>`).join('');
+  }
+
+  // ---- Clientes ----
+  async function openClient(client, preset) {
+    state.editingClient = client || null;
+    $('clientDlgTitle').textContent = client ? 'Editar cliente PMC' : 'Agregar cliente PMC';
+    $('c-org').value = client ? client.organizationName : (preset ? preset.organizationName : '');
+    $('c-org').disabled = Boolean(client);
+    $('c-level').innerHTML = `<option value="">Sin nivel</option>${state.levels.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}`;
+    $('c-level').value = client && client.levelId ? String(client.levelId) : '';
+    $('c-since').value = client && client.pmcSince ? client.pmcSince : '';
+    $('c-logo').value = client ? client.logoUrl : '';
+    $('c-active').checked = client ? client.active : true;
+    $('clientMsg').innerHTML = '';
+    $('clientDlg').showModal();
+    loadOrganizations().catch((error) => showMsg('clientMsg', 'err', error.message));
+  }
+
+  $('addClientBtn').onclick = () => openClient(null);
+  $('saveClientBtn').onclick = () => busy($('saveClientBtn'), async () => {
+    try {
+      await loadOrganizations();
+      const organization = state.editingClient
+        ? { id: state.editingClient.organizationId }
+        : state.organizations.find((o) => o.name.toLowerCase() === $('c-org').value.trim().toLowerCase());
+      if (!organization) throw new Error('Elige una Organization de la lista');
+      await api('/api/impact?view=clients', { method: 'PUT', body: {
+        organizationId: organization.id, levelId: $('c-level').value || null, pmcSince: $('c-since').value || null, logoUrl: $('c-logo').value.trim(), active: $('c-active').checked,
+      } });
+      $('clientDlg').close();
+      $('suggestions').innerHTML = '';
+      await load();
+    } catch (error) {
+      showMsg('clientMsg', 'err', error.message);
+    }
+  });
+
+  $('suggestBtn').onclick = () => busy($('suggestBtn'), async () => {
+    $('suggestions').innerHTML = '<div class="muted" style="margin-bottom:10px;">Buscando tickets marcados "Cuenta Janis: PMC" en los últimos 90 días…</div>';
+    try {
+      const { suggestions } = await api('/api/impact?view=suggestions');
+      $('suggestions').innerHTML = suggestions.length
+        ? `<div class="msg warn"><b>Organizations con tickets PMC que no están en la lista:</b><div class="row" style="margin-top:8px;">${suggestions.map((s, i) => `<button data-suggest="${i}">+ ${esc(s.organizationName)} <span class="muted">(${s.tickets})</span></button>`).join('')}</div></div>`
+        : '<div class="msg ok">Todas las Organizations con tickets PMC de los últimos 90 días ya están en la lista.</div>';
+      document.querySelectorAll('[data-suggest]').forEach((b) => { b.onclick = () => openClient(null, suggestions[Number(b.dataset.suggest)]); });
+    } catch (error) {
+      showMsg('suggestions', 'err', error.message);
+    }
+  });
+
+  // ---- Niveles ----
+  function openLevel(level) {
+    state.editingLevel = level || null;
+    $('l-name').value = level ? level.name : '';
+    $('l-fr').value = level && level.firstResponseHours !== null ? level.firstResponseHours : '';
+    $('l-res').value = level && level.resolutionHours !== null ? level.resolutionHours : '';
+    $('levelMsg').innerHTML = '';
+    $('levelDlg').showModal();
+  }
+  $('addLevelBtn').onclick = () => openLevel(null);
+  $('saveLevelBtn').onclick = () => busy($('saveLevelBtn'), async () => {
+    try {
+      await api('/api/impact?view=levels', { method: 'POST', body: {
+        id: state.editingLevel ? state.editingLevel.id : null, name: $('l-name').value, firstResponseHours: $('l-fr').value, resolutionHours: $('l-res').value,
+      } });
+      $('levelDlg').close();
+      await load();
+    } catch (error) {
+      showMsg('levelMsg', 'err', error.message);
+    }
+  });
+
+  // ---- Ajustes y sincronización ----
+  $('saveSettingsBtn').onclick = () => busy($('saveSettingsBtn'), async () => {
+    try {
+      const { needsResync } = await api('/api/impact?view=settings', { method: 'PUT', body: { agents: $('agents').value, escalationProjects: $('escalation').value, timezone: $('timezone').value } });
+      showMsg('settingsMsg', needsResync ? 'warn' : 'ok', needsResync ? 'Guardado. Cambiaron los agentes o el escalamiento: usa "Recalcular todo" para aplicarlo a la historia.' : 'Guardado.');
+      await load();
+    } catch (error) {
+      showMsg('settingsMsg', 'err', error.message);
+    }
+  });
+
+  // Corre partes de la sincronización hasta terminar la carga inicial.
+  async function syncLoop(reset) {
+    $('syncMsg').innerHTML = '';
+    let first = true;
+    for (let i = 0; i < 200; i++) {
+      const result = await api(`/api/impact?action=sync${reset && first ? '&reset=1' : ''}`, { method: 'POST' });
+      first = false;
+      if (result.skipped) { showMsg('syncMsg', 'warn', result.reason); break; }
+      const config = await api('/api/impact?view=config');
+      renderSync(config.sync);
+      if (result.phase === 'incremental') { showMsg('syncMsg', 'ok', 'Datos al día.'); break; }
+    }
+  }
+  $('syncBtn').onclick = () => busy($('syncBtn'), () => syncLoop(false).catch((error) => showMsg('syncMsg', 'err', error.message)));
+  $('resyncBtn').onclick = () => {
+    if (!confirm('Se vuelve a leer la historia completa de Jira (2 años). Puede tardar varios minutos. ¿Seguir?')) return;
+    busy($('resyncBtn'), () => syncLoop(true).catch((error) => showMsg('syncMsg', 'err', error.message)));
+  };
+
+  CS.initPage().then(load).catch((error) => showMsg('pageMsg', 'err', error.message));
+})();
+</script>
+</body>
+</html>

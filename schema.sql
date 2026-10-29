@@ -92,3 +92,47 @@ CREATE TABLE IF NOT EXISTS cache_entries (
   data JSONB NOT NULL,
   fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---- Impacto Care (lib/impact/store.js) ----
+CREATE TABLE IF NOT EXISTS pmc_levels (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,                 -- ej. Gold
+  first_response_hours NUMERIC,              -- meta de contrato (horas corridas)
+  resolution_hours NUMERIC,
+  updated_by TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS pmc_clients (
+  organization_id TEXT PRIMARY KEY,          -- Organization de JSM
+  organization_name TEXT NOT NULL,
+  level_id INTEGER REFERENCES pmc_levels(id) ON DELETE SET NULL,
+  pmc_since DATE,                            -- alta en PMC (antes / después)
+  logo_url TEXT NOT NULL DEFAULT '',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_by TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS impact_settings (
+  key TEXT PRIMARY KEY,                      -- 'config' (agentes, escalamiento, zona horaria), 'sync', 'sync-lock'
+  value JSONB NOT NULL,
+  updated_by TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Solo métricas por ticket: sin textos ni personas.
+CREATE TABLE IF NOT EXISTS ticket_facts (
+  issue_key TEXT PRIMARY KEY,
+  org_ids JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ NOT NULL,
+  resolved_at TIMESTAMPTZ,
+  state TEXT NOT NULL,                       -- open | resolved | cancelled
+  first_response_at TIMESTAMPTZ,             -- primera respuesta real de un agente de Care
+  jira_sla_breached BOOLEAN,                 -- SLA "Time to resolution" de Jira
+  jira_sla_elapsed_ms BIGINT,
+  jira_sla_goal_ms BIGINT,
+  escalated BOOLEAN NOT NULL DEFAULT FALSE,  -- enlace a un ticket de desarrollo (HDI)
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ticket_facts_created_idx ON ticket_facts (created_at);
