@@ -9,7 +9,7 @@ const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 // PUT /api/organizations?domains=<orgId> { domains: [...] }
 module.exports = async (req, res) => {
   try {
-    const user = await requireUser(req);
+    const user = await requireUser(req, res);
     const { domains: domainsOrgId, refresh } = req.query || {};
 
     if (domainsOrgId) {

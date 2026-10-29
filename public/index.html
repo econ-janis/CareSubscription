@@ -77,8 +77,6 @@
   .dlg-body { padding: 4px 20px 20px; }
   .dlg-foot { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 20px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--surface); }
   iframe.preview { width: 100%; height: 70vh; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
-  .login { max-width: 420px; margin: 12vh auto; text-align: center; }
-  .login img { height: 40px; margin-bottom: 16px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .chip { background: var(--bg); border: 1px solid var(--border); border-radius: 9999px; padding: 2px 10px; font-size: 12px; }
   .domains-box { margin-top: 8px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 12px; }
@@ -96,25 +94,12 @@
   <h1>CareSubscription</h1>
   <span class="user" id="userEmail"></span>
   <button class="icon-btn" id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
-  <button class="hidden" id="logoutBtn">Salir</button>
+  <a class="btn hidden" id="logoutBtn" href="/logout" style="text-decoration:none;font-size:14px;">Cerrar sesión</a>
 </header>
 
 <main>
-  <section id="loginView" class="card login hidden">
-    <img src="/brand/iso-color.svg" alt="">
-    <h2>Ingresá a CareSubscription</h2>
-    <p class="muted">Acceso restringido al equipo de Janis.</p>
-    <form id="loginForm" style="text-align:left;">
-      <label for="l-email">Tu correo de <span id="userDomain">janiscommerce.com</span></label>
-      <input type="text" id="l-email" autocomplete="email" inputmode="email">
-      <label for="l-key">Clave de acceso</label>
-      <input type="password" id="l-key" autocomplete="current-password">
-      <div style="margin-top:16px;"><button type="submit" class="primary" id="loginBtn" style="width:100%;">Ingresar</button></div>
-    </form>
-    <div id="loginMsg"></div>
-  </section>
-
   <section id="appView" class="hidden">
+    <div id="mainMsg"></div>
     <div class="row" style="margin-bottom:16px;">
       <div>
         <h2>Suscripciones</h2>
@@ -329,7 +314,7 @@
       credentials: 'same-origin',
     });
     const payload = await response.json().catch(() => ({}));
-    if (response.status === 401 && !path.startsWith('/api/auth')) { showLogin(); }
+    if (response.status === 401) { goToLogin(); }
     if (!response.ok) {
       const error = new Error(payload.error || `Error ${response.status}`);
       error.payload = payload;
@@ -353,57 +338,31 @@
 
   document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => b.closest('dialog').close(); });
 
-  // ---- Acceso con clave compartida ----
-  function showLogin() {
-    $('appView').classList.add('hidden');
-    $('loginView').classList.remove('hidden');
-    $('logoutBtn').classList.add('hidden');
-    $('userEmail').textContent = '';
+  // ---- Acceso con Janis ID ----
+  // Sin sesión se va a /login, que vuelve a esta misma dirección después de
+  // ingresar. Los tokens de Janis nunca llegan al navegador.
+  function goToLogin() {
+    location.replace(`/login?returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
   }
 
   async function initAuth() {
-    const { user, userDomain, mailEnabled, slackEnabled, slackChannel, accessConfigured } = await api('/api/auth');
+    const { user, mailEnabled, slackEnabled, slackChannel } = await api('/api/auth');
     state.mailEnabled = mailEnabled;
     state.slackEnabled = slackEnabled;
     state.slackChannel = slackChannel;
-    $('userDomain').textContent = userDomain;
     if (user) return startApp(user);
-
-    showLogin();
-    if (!accessConfigured) showMsg('loginMsg', 'err', 'Falta configurar ACCESS_KEY (mínimo 16 caracteres) en el despliegue.');
+    goToLogin();
   }
-
-  $('loginForm').onsubmit = (event) => {
-    event.preventDefault();
-    busy($('loginBtn'), async () => {
-      clearMsg('loginMsg');
-      try {
-        const { user } = await api('/api/auth', { method: 'POST', body: { email: $('l-email').value, accessKey: $('l-key').value } });
-        $('l-key').value = '';
-        startApp(user);
-      } catch (error) {
-        showMsg('loginMsg', 'err', error.message);
-      }
-    });
-  };
-
-  $('logoutBtn').onclick = async () => { await api('/api/auth', { method: 'DELETE' }); location.reload(); };
 
   async function startApp(user) {
     state.user = user;
-    $('loginView').classList.add('hidden');
     $('appView').classList.remove('hidden');
     $('logoutBtn').classList.remove('hidden');
-    $('userEmail').textContent = user.email;
+    $('userEmail').textContent = user.name && user.name !== user.email ? `${user.name} · ${user.email}` : user.email;
+    $('userEmail').title = user.email;
     $('mailBanner').classList.toggle('hidden', state.mailEnabled);
     $('groupTestBtn').disabled = !state.mailEnabled;
     $('groupTestBtn').title = state.mailEnabled ? '' : 'El envío de correo todavía no está configurado';
-    // Si vino de la landing de un envío agrupado, volver ahí después del login.
-    const next = new URLSearchParams(location.search).get('next') || '';
-    if (/^\/reportes\/\d+\/\d{4}-\d{2}-\d{2}/.test(next)) {
-      location.replace(next);
-      return;
-    }
     // Los agrupados muestran los logos de sus suscripciones: cargar después.
     await loadList();
     await loadGroups();
@@ -979,7 +938,7 @@
     }
   }
 
-  initAuth().catch((error) => { showLogin(); showMsg('loginMsg', 'err', error.message); });
+  initAuth().catch((error) => { $('appView').classList.remove('hidden'); showMsg('mainMsg', 'err', `No se pudo cargar la sesión: ${error.message}`); });
 })();
 </script>
 </body>

@@ -63,8 +63,7 @@ Cada envío agrupado define días de la semana, hora y zona horaria (por defecto
 
 ## Seguridad y privacidad (ISO 27001/27002, GDPR)
 
-- **Acceso**: la UI y la API requieren una clave compartida (`ACCESS_KEY`) y que el usuario declare su correo de `USER_DOMAIN`, que se usa para la auditoría y para "Enviar prueba". El servidor emite una cookie de sesión HttpOnly, Secure y SameSite=Lax, firmada y válida por 12 h. Rotar la clave cierra todas las sesiones. Sin `ACCESS_KEY` no se puede entrar: la app muestra tickets y destinatarios de clientes, así que nunca queda pública.
-  - Limitación: el correo declarado no se verifica. Para tener identidad verificada, el siguiente paso es SSO con Google Workspace.
+- **Acceso**: exclusivamente con **Janis ID** (ver [Ingreso con Janis ID](#ingreso-con-janis-id)). Solo entran cuentas con correo de `USER_DOMAIN`, porque Janis ID también lo usan los clientes. El correo verificado se usa para la auditoría y para "Enviar prueba". La app muestra tickets y destinatarios de clientes, así que nunca queda pública: sin configurar Janis ID no se puede entrar.
 - **Destinatarios**: deben tener formato válido y un dominio de la lista permitida, que es `ALLOWED_RECIPIENT_DOMAINS` más los dominios del cliente cargados para esa Organization desde la UI. Se validan al guardar y otra vez en cada envío.
 - **Enviar prueba**: se envía solo a quien está configurando.
 - **Auditoría**: se registra quién creó, modificó o borró cada suscripción (y los dominios de cada Organization), cuándo y qué campos cambió.
@@ -78,12 +77,49 @@ Cada envío agrupado define días de la semana, hora y zona horaria (por defecto
 2. Cargar en Vercel las variables obligatorias de `.env.example`:
    - `DATABASE_URL`
    - `JIRA_EMAIL` y `JIRA_API_TOKEN`: cuenta de servicio con acceso a JSM.
-   - `ACCESS_KEY`: mínimo 16 caracteres aleatorios. Se comparte por un canal seguro con quienes usan la app.
+   - `JANIS_CLIENT_ID`, `JANIS_CLIENT_SECRET`, `JANIS_REDIRECT_URI` y `SESSION_SECRET` (ver [Ingreso con Janis ID](#ingreso-con-janis-id)).
 3. Listo para crear suscripciones y usar la vista previa. **Sin SMTP no se envía ningún correo** (ni programado ni de prueba) y la UI lo avisa.
 4. Para activar los envíos, más adelante:
    - Cargar `SMTP_*`, `MAIL_FROM` y `CRON_SECRET` en Vercel.
    - Cargar los secrets `DISPATCH_URL` (`https://<deploy>/api/dispatch`) y `CRON_SECRET` en GitHub, para el workflow horario.
 5. Tests: `npm install && npm test`.
+
+## Ingreso con Janis ID
+
+OpenID Connect con authorization code flow contra Janis ID (app **Confidential**, `client_secret_post`, más PKCE S256). Datos del discovery (`https://id.janis.in/.well-known/openid-configuration`): issuer `https://id.janis.in`, authorize `https://app.janis.in/oauth/authorize`, token `https://id.janis.in/api/oauth/2.0/token` y JWKS `https://cdn.id.janis.in/.well-known/jwks.json` (RS256).
+
+**Configuración en Janis ID** (admin de la app: `https://app.janis.in/id/app/edit/6ae203fa14168e5d768f015c`):
+- La app tiene que estar **Activa**.
+- Redirect URIs: `https://caresubscription.vercel.app/login` y, para desarrollo, `http://localhost:3000/login`.
+- Scopes: `openid profile email` (más adelante, scopes de servicio como `oms:order:read`, agregándolos a `JANIS_SCOPE`).
+
+**Variables de entorno** (Vercel → Settings → Environment Variables; en local, `.env.local`):
+
+| Variable | Valor |
+|---|---|
+| `JANIS_CLIENT_ID` | Client ID de la app en Janis ID |
+| `JANIS_CLIENT_SECRET` | Client secret (solo en variables de entorno; nunca en el código, commits ni logs) |
+| `JANIS_REDIRECT_URI` | `https://caresubscription.vercel.app/login` (local: `http://localhost:3000/login`) |
+| `JANIS_SCOPE` | `openid profile email` |
+| `SESSION_SECRET` | 32 bytes en base64: `openssl rand -base64 32`. Rotarla cierra todas las sesiones |
+| `USER_DOMAIN` | `janiscommerce.com` (dominio de las cuentas que pueden entrar) |
+
+**Rutas** (rewrites de `vercel.json` hacia `api/auth.js`):
+- `/login`: es el Redirect URI.
+  - Sin `?code`, muestra "Ingresar con Janis". El botón genera `state`, `nonce` y el verificador PKCE, los guarda en una cookie cifrada de 10 minutos y redirige al authorize.
+  - Con `?code`, es el callback: valida el `state` (alterado o vencido → rechazo), canjea el code y valida el `id_token` con la JWKS (firma RS256, issuer, audience = client ID, vencimiento y nonce). Después crea la sesión y vuelve al `returnTo` original (solo rutas relativas).
+  - Con `?error`, muestra un mensaje y "Reintentar".
+- `/logout`: borra la sesión y vuelve a `/login`.
+- `/api/me`: `{ sub, email, name }`.
+- Sin sesión, la UI y la landing de los envíos redirigen a `/login?returnTo=<ruta>`, y las APIs responden 401.
+
+**Sesión:** cookie HttpOnly, Secure y SameSite=Lax, cifrada con AES-256-GCM (clave derivada de `SESSION_SECRET`). Si hace falta, se parte en `cs_session.0`, `.1`… por el límite de ~4 KB. Guarda `sub`, `email`, `name`, `accessToken`, `refreshToken` y `expiresAt`. Los tokens nunca llegan al navegador ni a las respuestas de la API. Si el access token venció y hay refresh token, se renueva del lado del servidor; si falla (o no hay refresh token), se cierra la sesión. La sesión dura como máximo 12 h.
+
+**Helpers de servidor:** `getSession(req, res)` (`lib/auth.js`) devuelve la sesión con los tokens, renovándolos si hace falta. `janisFetch(session, url, options)` (`lib/janis-id.js`) llama APIs de Janis con el access token del usuario, para cuando se agreguen scopes de servicio.
+
+**Por qué `node:crypto` y no `jose`:** las versiones actuales de `jose` son solo ESM y no cargan con `require()` en el runtime de Vercel; eso ya provocó un error 500 en producción (`ERR_REQUIRE_ESM`). La verificación RS256 con JWK y el cifrado AES-GCM salen de `node:crypto`, sin dependencias nuevas.
+
+**Logs:** solo se registra qué paso del ingreso falló (por ejemplo, "state inválido" o "token endpoint respondió 400 (invalid_grant)"). Nunca se loguean tokens, secretos, correos ni nombres.
 
 ## Varias Organizations por suscripción
 
