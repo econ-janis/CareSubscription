@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impacto Care · CareSubscription</title>
+<link rel="icon" href="/brand/iso-color.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  .filters { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 0 0 20px; }
+  .filters label { margin: 0 0 6px; }
+  .filters select { width: auto; min-width: 180px; }
+  .hero { display: grid; grid-template-columns: minmax(260px, 1fr) 1.4fr; gap: 16px; }
+  .hero-main { background: linear-gradient(135deg, #2979FF, #1759FF); color: #fff; border: 0; display: flex; flex-direction: column; justify-content: center; }
+  .hero-main .eyebrow { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .9; }
+  .hero-main .big { font-size: 56px; font-weight: 800; line-height: 1.05; margin: 6px 0; font-variant-numeric: tabular-nums; }
+  .hero-main .sub { font-size: 14px; line-height: 1.6; opacity: .95; }
+  .achievements h2 { display: flex; align-items: center; gap: 8px; }
+  .achievements ul { list-style: none; margin: 12px 0 0; padding: 0; }
+  .achievements li { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); line-height: 1.45; }
+  .achievements li:last-child { border-bottom: 0; }
+  .achievements .ic { flex: 0 0 22px; text-align: center; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .stat .label { color: var(--muted); font-size: 13px; font-weight: 600; }
+  .stat .value { font-size: 30px; font-weight: 700; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .stat .value small { font-size: 15px; font-weight: 600; color: var(--muted); margin-left: 2px; }
+  .stat .delta { font-size: 12px; font-weight: 600; }
+  .delta.good { color: var(--ok); } .delta.bad { color: var(--bad); } .delta.flat { color: var(--muted); }
+  .stat .hint { color: var(--faint); font-size: 12px; margin-top: 2px; }
+  .stat svg.spark { margin-top: 10px; width: 100%; max-width: 260px; height: auto; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card h2 { font-size: 15px; }
+  .chart-card .desc { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 16px; height: 2px; border-radius: 2px; }
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0, 18, 51, .14); border-radius: 10px; padding: 8px 10px; font-size: 12px; min-width: 150px; z-index: 2; }
+  .tooltip .t { color: var(--muted); margin-bottom: 4px; }
+  .tooltip .r { display: flex; align-items: center; gap: 8px; }
+  .tooltip .r b { font-size: 13px; }
+  .tooltip .r i { display: inline-block; width: 12px; height: 2px; border-radius: 2px; }
+  details.data { margin-top: 8px; font-size: 12px; }
+  details.data summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+  details.data table { margin-top: 6px; }
+  table.list.small td, table.list.small th { padding: 5px 6px; font-size: 12px; }
+  tr.click { cursor: pointer; }
+  tr.click:hover td { background: var(--bg); }
+  .spark { width: 110px; height: auto; display: block; }
+  .ba { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
+  .ba > div { border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+  .ba .k { color: var(--muted); font-size: 12px; font-weight: 600; }
+  .ba .v { font-size: 18px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .empty { text-align: center; padding: 40px 20px; }
+  .empty h2 { margin-bottom: 8px; }
+  @media (max-width: 960px) { .hero, .charts { grid-template-columns: 1fr; } .tiles { grid-template-columns: 1fr 1fr; } .ba { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .tiles { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main class="stack">
+  <div class="row">
+    <div>
+      <h1 class="page">Impacto Care</h1>
+      <p class="lead" id="subtitle" style="margin:0;">Cargando…</p>
+    </div>
+  </div>
+  <div id="pageMsg"></div>
+
+  <div class="filters hidden" id="filters">
+    <div><label for="period">Período</label>
+      <select id="period">
+        <option value="12">Últimas 12 semanas</option>
+        <option value="26" selected>Últimas 26 semanas</option>
+        <option value="52">Último año</option>
+        <option value="104">Últimos 2 años</option>
+      </select>
+    </div>
+    <div><label for="client">Cliente</label><select id="client"><option value="">Todos los clientes PMC</option></select></div>
+  </div>
+
+  <div id="content" class="stack hidden">
+    <section class="hero">
+      <div class="card hero-main">
+        <div class="eyebrow" id="heroEyebrow">Últimas 4 semanas</div>
+        <div class="big" id="heroValue">—</div>
+        <div class="sub" id="heroSub"></div>
+      </div>
+      <div class="card achievements">
+        <h2>🏆 Logros de Care</h2>
+        <ul id="achievements"></ul>
+      </div>
+    </section>
+
+    <section>
+      <div class="row" style="margin-bottom:10px;"><h2 id="tilesTitle">Indicadores</h2><span class="muted" id="tilesHint"></span></div>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <section class="card" id="beforeAfter" hidden></section>
+
+    <section class="charts">
+      <div class="card chart-card"><h2>Tickets creados y resueltos por semana</h2><p class="desc">Si los resueltos acompañan o superan a los creados, el backlog no crece.</p><div class="chart" id="chFlow"></div></div>
+      <div class="card chart-card"><h2>Backlog abierto al cierre de cada semana</h2><p class="desc">Tickets que seguían abiertos el domingo a la noche.</p><div class="chart" id="chBacklog"></div></div>
+      <div class="card chart-card"><h2>Primera respuesta real (mediana, horas)</h2><p class="desc">Desde que el cliente abre el ticket hasta la primera respuesta de un agente de Care (sin contar la automática).</p><div class="chart" id="chFirst"></div></div>
+      <div class="card chart-card"><h2>Tiempo de resolución (mediana, horas)</h2><p class="desc">Desde que se crea hasta que se resuelve, de los tickets resueltos en cada semana.</p><div class="chart" id="chResolution"></div></div>
+      <div class="card chart-card"><h2>% de tickets resueltos dentro del SLA</h2><p class="desc">SLA de Jira ("Time to resolution") y SLA de contrato según el nivel PMC de cada cliente.</p><div class="chart" id="chSla"></div></div>
+      <div class="card chart-card"><h2>% resuelto por Care sin escalar a desarrollo</h2><p class="desc">Tickets resueltos sin enlace a un ticket de desarrollo (HDI).</p><div class="chart" id="chCare"></div></div>
+    </section>
+
+    <section class="card" id="clientsCard">
+      <div class="row" style="margin-bottom:8px;"><h2>Por cliente</h2><span class="muted">Últimas 4 semanas completas. Haz clic en un cliente para ver su detalle.</span></div>
+      <div class="table-wrap"><table class="list" id="clientsTable"></table></div>
+    </section>
+    <p class="muted" id="footnote"></p>
+  </div>
+
+  <section class="card empty hidden" id="empty"></section>
+</main>
+
+<script src="/assets/app.js"></script>
+<script>
+(() => {
+  const { $, esc, api, showMsg } = CS;
+  let data = null;
+
+  // ---- Formato ----
+  const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const dateOf = (week) => new Date(`${week}T12:00:00Z`);
+  const shortDate = (week) => { const d = dateOf(week); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; };
+  const weekRange = (week) => { const end = new Date(dateOf(week).getTime() + 6 * 86400000); return `Semana del ${shortDate(week)} al ${end.getUTCDate()} ${MONTHS[end.getUTCMonth()]} ${end.getUTCFullYear()}`; };
+  const num = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: 1 }));
+  const hours = (v) => {
+    if (v === null || v === undefined) return '—';
+    if (v < 1) return `${Math.round(v * 60)} min`;
+    if (v >= 48) return `${num(Math.round(v / 24 * 10) / 10)} días`;
+    return `${num(Math.round(v * 10) / 10)} h`;
+  };
+  const percent = (v) => (v === null || v === undefined ? '—' : `${Math.round(v)} %`);
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  // ---- Gráfico de líneas (SVG a mano: hairlines, líneas de 2px, punto final con anillo, crosshair + tooltip) ----
+  // Máximo "redondo" con 4 divisiones limpias (ej. 38 -> 40 en pasos de 10).
+  function niceMax(value, percentScale) {
+    if (percentScale) return 100;
+    if (!value || value <= 0) return 4;
+    const raw = value / 4;
+    const pow = 10 ** Math.floor(Math.log10(raw));
+    const step = [1, 2, 5, 10].map((k) => k * pow).find((k) => k >= raw);
+    return step * 4;
+  }
+
+  function lineChart(el, { weeks, series, format, percentScale = false, area = false, height = 220 }) {
+    el.innerHTML = '';
+    const width = Math.max(280, el.clientWidth);
+    const m = { l: 44, r: 52, t: 10, b: 26 };
+    const w = width - m.l - m.r;
+    const h = height - m.t - m.b;
+    const all = series.flatMap((s) => s.values).filter((v) => v !== null && v !== undefined);
+    if (!all.length) { el.innerHTML = '<p class="muted" style="padding:24px 0;text-align:center;">Sin datos en este período.</p>'; return; }
+    const max = niceMax(Math.max(...all), percentScale);
+    const x = (i) => m.l + (weeks.length === 1 ? w / 2 : (i * w) / (weeks.length - 1));
+    const y = (v) => m.t + h - (v / max) * h;
+    const surface = cssVar('--surface');
+    const ns = 'http://www.w3.org/2000/svg';
+
+    if (series.length > 1) {
+      const legend = document.createElement('div');
+      legend.className = 'legend';
+      for (const s of series) {
+        const span = document.createElement('span');
+        const key = document.createElement('i');
+        key.style.background = cssVar(s.color);
+        span.append(key, document.createTextNode(s.name));
+        legend.append(span);
+      }
+      el.append(legend);
+    }
+
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('height', height);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', series.map((s) => s.name).join(', '));
+    const add = (tag, attrs, parent = svg) => { const node = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v); parent.append(node); return node; };
+
+    // Grilla y eje Y (4 divisiones).
+    for (let i = 0; i <= 4; i++) {
+      const value = (max * i) / 4;
+      add('line', { x1: m.l, x2: m.l + w, y1: y(value), y2: y(value), stroke: cssVar('--grid'), 'stroke-width': 1 });
+      const t = add('text', { x: m.l - 8, y: y(value) + 4, 'text-anchor': 'end', 'font-size': 11, fill: cssVar('--faint') });
+      t.textContent = percentScale ? `${Math.round(value)}%` : num(value >= 10 ? Math.round(value) : value);
+    }
+    // Eje X: primera semana de cada mes (o cada trimestre si son muchas),
+    // con al menos 44 px entre etiquetas para que no se pisen.
+    const step = weeks.length > 60 ? 3 : 1;
+    let lastX = -Infinity;
+    weeks.forEach((week, i) => {
+      const d = dateOf(week);
+      const month = d.getUTCMonth();
+      if (d.getUTCDate() > 7 || (d.getUTCFullYear() * 12 + month) % step || x(i) - lastX < 44) return;
+      lastX = x(i);
+      const t = add('text', { x: x(i), y: height - 6, 'text-anchor': 'middle', 'font-size': 11, fill: cssVar('--faint') });
+      t.textContent = month === 0 ? `${MONTHS[month]} ${String(d.getUTCFullYear()).slice(2)}` : MONTHS[month];
+    });
+
+    // Series (los null cortan la línea). Las etiquetas finales que quedarían
+    // a menos de 14 px de otra se omiten (el valor queda en la leyenda,
+    // el tooltip y la tabla).
+    const endLabels = [];
+    for (const s of series) {
+      const color = cssVar(s.color);
+      const segments = [];
+      let current = [];
+      s.values.forEach((v, i) => {
+        if (v === null || v === undefined) { if (current.length) segments.push(current); current = []; return; }
+        current.push([x(i), y(v)]);
+      });
+      if (current.length) segments.push(current);
+      for (const seg of segments) {
+        if (area && series.length === 1 && seg.length > 1) {
+          add('path', { d: `M${seg[0][0]},${y(0)} ${seg.map((p) => `L${p[0]},${p[1]}`).join(' ')} L${seg[seg.length - 1][0]},${y(0)} Z`, fill: cssVar('--s1-wash') });
+        }
+        if (seg.length > 1) add('path', { d: seg.map((p, i) => `${i ? 'L' : 'M'}${p[0]},${p[1]}`).join(' '), fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+        else add('circle', { cx: seg[0][0], cy: seg[0][1], r: 2.5, fill: color });
+      }
+      // Punto y valor final (etiqueta directa solo en el extremo).
+      const lastIndex = s.values.map((v) => v !== null && v !== undefined).lastIndexOf(true);
+      if (lastIndex >= 0) {
+        add('circle', { cx: x(lastIndex), cy: y(s.values[lastIndex]), r: 4, fill: color, stroke: surface, 'stroke-width': 2 });
+        const ly = y(s.values[lastIndex]);
+        if (!endLabels.some((other) => Math.abs(other - ly) < 14)) {
+          endLabels.push(ly);
+          const t = add('text', { x: x(lastIndex) + 8, y: ly + 4, 'font-size': 12, 'font-weight': 700, fill: cssVar('--text') });
+          t.textContent = format(s.values[lastIndex]);
+        }
+      }
+    }
+
+    // Hover: crosshair que se ajusta a la semana más cercana + tooltip con todas las series.
+    const cross = add('line', { y1: m.t, y2: m.t + h, stroke: cssVar('--faint'), 'stroke-width': 1, visibility: 'hidden' });
+    const dots = series.map((s) => add('circle', { r: 4, fill: cssVar(s.color), stroke: surface, 'stroke-width': 2, visibility: 'hidden' }));
+    const hit = add('rect', { x: m.l - 10, y: 0, width: w + 20, height, fill: 'transparent' });
+    hit.setAttribute('tabindex', '0');
+    el.append(svg);
+    const tip = document.createElement('div');
+    tip.className = 'tooltip hidden';
+    el.append(tip);
+
+    function show(i) {
+      cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+      tip.textContent = '';
+      const title = document.createElement('div'); title.className = 't'; title.textContent = weekRange(weeks[i]); tip.append(title);
+      series.forEach((s, k) => {
+        const v = s.values[i];
+        dots[k].setAttribute('visibility', v === null || v === undefined ? 'hidden' : 'visible');
+        if (v !== null && v !== undefined) { dots[k].setAttribute('cx', x(i)); dots[k].setAttribute('cy', y(v)); }
+        const row = document.createElement('div'); row.className = 'r';
+        const key = document.createElement('i'); key.style.background = cssVar(s.color);
+        const value = document.createElement('b'); value.textContent = format(v);
+        row.append(key, value, document.createTextNode(s.name));
+        tip.append(row);
+      });
+      tip.classList.remove('hidden');
+      const offset = svg.getBoundingClientRect().width / width;
+      const left = x(i) * offset;
+      tip.style.top = `${(series.length > 1 ? 24 : 0) + 4}px`;
+      tip.style.left = `${Math.min(Math.max(0, left + 12), el.clientWidth - tip.offsetWidth)}px`;
+      if (left + 12 + tip.offsetWidth > el.clientWidth) tip.style.left = `${Math.max(0, left - tip.offsetWidth - 12)}px`;
+    }
+    function hide() { cross.setAttribute('visibility', 'hidden'); dots.forEach((d) => d.setAttribute('visibility', 'hidden')); tip.classList.add('hidden'); }
+    let focusIndex = weeks.length - 1;
+    hit.addEventListener('pointermove', (event) => {
+      const rect = svg.getBoundingClientRect();
+      const px = ((event.clientX - rect.left) / rect.width) * width;
+      focusIndex = Math.round(((px - m.l) / w) * (weeks.length - 1));
+      show(Math.min(weeks.length - 1, Math.max(0, focusIndex)));
+    });
+    hit.addEventListener('pointerleave', hide);
+    hit.addEventListener('focus', () => show(focusIndex));
+    hit.addEventListener('blur', hide);
+    hit.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') focusIndex = Math.max(0, focusIndex - 1);
+      else if (event.key === 'ArrowRight') focusIndex = Math.min(weeks.length - 1, focusIndex + 1);
+      else return;
+      event.preventDefault();
+      show(focusIndex);
+    });
+
+    // Vista de tabla (los valores no dependen del hover).
+    const details = document.createElement('details');
+    details.className = 'data';
+    details.innerHTML = '<summary>Ver datos</summary>';
+    const table = document.createElement('table');
+    table.className = 'list small';
+    const head = document.createElement('tr');
+    for (const label of ['Semana', ...series.map((s) => s.name)]) { const th = document.createElement('th'); th.textContent = label; head.append(th); }
+    table.append(head);
+    [...weeks.keys()].reverse().forEach((i) => {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td'); td.textContent = shortDate(weeks[i]); tr.append(td);
+      for (const s of series) { const cell = document.createElement('td'); cell.className = 'num'; cell.textContent = format(s.values[i]); tr.append(cell); }
+      table.append(tr);
+    });
+    const wrap = document.createElement('div'); wrap.className = 'table-wrap'; wrap.append(table);
+    details.append(wrap);
+    el.append(details);
+  }
+
+  function sparkline(values, { color = '--s1', W = 110, H = 28 } = {}) {
+    const points = values.map((v, i) => [i, v]).filter(([, v]) => v !== null && v !== undefined);
+    if (points.length < 2) return '';
+    const max = Math.max(...points.map((p) => p[1]));
+    const min = Math.min(...points.map((p) => p[1]));
+    const px = (i) => 3 + (i / (values.length - 1)) * (W - 6);
+    const py = (v) => H - 4 - ((v - min) / ((max - min) || 1)) * (H - 8);
+    const d = points.map(([i, v], k) => `${k ? 'L' : 'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+    const [li, lv] = points[points.length - 1];
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="${cssVar('--faint')}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="${px(li)}" cy="${py(lv)}" r="3" fill="${cssVar(color)}"/></svg>`;
+  }
+
+  // ---- Indicadores ----
+  // better: 'up' (más es mejor), 'down' (menos es mejor).
+  function delta(change, better) {
+    if (change === null || change === undefined) return '<span class="delta flat">Sin comparación</span>';
+    if (Math.abs(change) < 1) return '<span class="delta flat">= igual que las 4 semanas anteriores</span>';
+    const good = better === 'up' ? change > 0 : change < 0;
+    return `<span class="delta ${good ? 'good' : 'bad'}">${change > 0 ? '▲' : '▼'} ${Math.abs(Math.round(change))} % ${good ? 'mejor' : 'peor'} que las 4 semanas anteriores</span>`;
+  }
+
+  function tile({ label, value, unit = '', change, better, hint, values }) {
+    return `<div class="card stat"><div class="label">${esc(label)}</div><div class="value">${value}${unit ? `<small>${esc(unit)}</small>` : ''}</div>${delta(change, better)}${hint ? `<div class="hint">${esc(hint)}</div>` : ''}${values ? sparkline(values, { W: 260, H: 34 }) : ''}</div>`;
+  }
+
+  function render() {
+    const period = Number($('period').value);
+    const clientId = $('client').value;
+    const impact = data.impact;
+    const client = clientId ? impact.clients.find((c) => c.organizationId === clientId) : null;
+    const scope = client || impact.total;
+    // Semanas completas (la semana en curso no se grafica).
+    const all = scope.series.slice(0, -1);
+    const series = all.slice(-period);
+    const weeks = series.map((w) => w.week);
+    const pick = (key) => series.map((w) => w[key]);
+    const s = scope.summary;
+    const cur = s.current;
+
+    // Hero
+    $('heroEyebrow').textContent = `${client ? client.name : 'Clientes PMC'} · últimas 4 semanas`;
+    $('heroValue').textContent = num(cur.resolved);
+    $('heroSub').innerHTML = `tickets resueltos por el equipo de Care<br>${percent(cur.noEscalationPct)} sin escalar a desarrollo · ${percent(cur.jiraSlaPct)} dentro del SLA`;
+
+    // Logros (los globales; con un cliente, los que lo nombran).
+    const list = client ? impact.achievements.filter((a) => a.text.includes(client.name)) : impact.achievements;
+    const icons = { backlog: '📉', record: '🏅', sla: '⏱️', care: '🛡️', speed: '⚡', clean: '✨' };
+    $('achievements').innerHTML = list.length
+      ? list.map((a) => `<li><span class="ic">${icons[a.kind] || '⭐'}</span><span>${esc(a.text)}</span></li>`).join('')
+      : '<li class="muted">Todavía no hay logros destacados para este período.</li>';
+
+    // Indicadores
+    $('tilesHint').textContent = `del ${shortDate(s.from)} al ${shortDate(s.to)}, comparado con las 4 semanas anteriores`;
+    const tiles = [
+      tile({ label: 'Primera respuesta real (mediana)', value: hours(cur.firstResponseH), change: s.change.firstResponseH, better: 'down', values: pick('firstResponseH') }),
+      tile({ label: 'Tiempo de resolución (mediana)', value: hours(cur.resolutionH), change: s.change.resolutionH, better: 'down', values: pick('resolutionH') }),
+      tile({ label: 'Dentro del SLA de Jira', value: percent(cur.jiraSlaPct), change: s.change.jiraSlaPct, better: 'up', values: pick('jiraSlaPct') }),
+      tile({ label: 'Dentro del SLA de contrato (resolución)', value: percent(cur.contractResolutionPct), change: s.change.contractResolutionPct, better: 'up', values: pick('contractResolutionPct'), hint: cur.contractResolutionPct === null ? 'Carga las metas por nivel en Clientes PMC' : '' }),
+      tile({ label: 'Primera respuesta dentro de la meta de contrato', value: percent(cur.contractFirstResponsePct), change: s.change.contractFirstResponsePct, better: 'up', values: pick('contractFirstResponsePct'), hint: cur.contractFirstResponsePct === null ? 'Carga las metas por nivel en Clientes PMC' : '' }),
+      tile({ label: 'Backlog abierto hoy', value: num(scope.openNow), change: s.change.backlog, better: 'down', values: pick('backlog'), hint: `${num(scope.openOlderThan30)} con más de 30 días` }),
+    ];
+    $('tiles').innerHTML = tiles.join('');
+
+    // Antes / después de PMC (con un cliente que tenga fecha de alta).
+    const ba = client && client.beforeAfter;
+    $('beforeAfter').hidden = !ba;
+    if (ba) {
+      const row = (label, before, after, fmt, better) => {
+        const arrow = before === null || before === undefined || after === null || after === undefined ? '' : (better === 'down' ? after < before : after > before) ? ' <span class="delta good">▲ mejor</span>' : after === before ? '' : ' <span class="delta bad">▼ peor</span>';
+        return `<div><div class="k">${esc(label)}</div><div class="v">${fmt(before)} → ${fmt(after)}${arrow}</div></div>`;
+      };
+      $('beforeAfter').innerHTML = `<h2>Antes y después de PMC</h2><p class="muted" style="margin:4px 0 0;">Alta en PMC: ${esc(new Date(`${ba.since}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }))}. Se comparan las ${ba.weeks} semanas anteriores al alta con las últimas ${ba.weeks} semanas.</p>${ba.before ? `<div class="ba">
+        ${row('Primera respuesta (mediana)', ba.before.firstResponseH, ba.after.firstResponseH, hours, 'down')}
+        ${row('Resolución (mediana)', ba.before.resolutionH, ba.after.resolutionH, hours, 'down')}
+        ${row('Dentro del SLA de Jira', ba.before.jiraSlaPct, ba.after.jiraSlaPct, percent, 'up')}
+        ${row('Resuelto sin escalar', ba.before.noEscalationPct, ba.after.noEscalationPct, percent, 'up')}
+      </div>` : '<p class="muted">No hay tickets anteriores al alta en la historia cargada.</p>'}`;
+    }
+
+    // Gráficos
+    lineChart($('chFlow'), { weeks, format: num, series: [{ name: 'Resueltos', color: '--s1', values: pick('resolved') }, { name: 'Creados', color: '--s2', values: pick('created') }] });
+    lineChart($('chBacklog'), { weeks, format: num, area: true, series: [{ name: 'Backlog', color: '--s1', values: pick('backlog') }] });
+    lineChart($('chFirst'), { weeks, format: hours, series: [{ name: 'Primera respuesta', color: '--s1', values: pick('firstResponseH') }] });
+    lineChart($('chResolution'), { weeks, format: hours, series: [{ name: 'Resolución', color: '--s1', values: pick('resolutionH') }] });
+    lineChart($('chSla'), { weeks, format: percent, percentScale: true, series: [{ name: 'SLA de Jira', color: '--s1', values: pick('jiraSlaPct') }, { name: 'SLA de contrato', color: '--s2', values: pick('contractResolutionPct') }] });
+    lineChart($('chCare'), { weeks, format: percent, percentScale: true, area: true, series: [{ name: 'Sin escalar', color: '--s1', values: pick('noEscalationPct') }] });
+
+    // Tabla por cliente
+    $('clientsCard').hidden = Boolean(client);
+    if (!client) {
+      $('clientsTable').innerHTML = `<tr><th>Cliente</th><th>Nivel</th><th class="num">Backlog hoy</th><th class="num">+30 días</th><th class="num">Resueltos</th><th class="num">1.ª respuesta</th><th class="num">Resolución</th><th class="num">SLA Jira</th><th class="num">SLA contrato</th><th class="num">Sin escalar</th><th>Backlog (12 sem.)</th></tr>${impact.clients.map((c) => {
+        const sc = c.summary.current;
+        return `<tr class="click" data-client="${esc(c.organizationId)}" tabindex="0">
+          <td><span class="org">${c.logoUrl ? `<img class="org-logo" src="${esc(c.logoUrl)}" alt="">` : '<img class="org-logo" src="/brand/iso-color.svg" alt="">'}${esc(c.name)}</span></td>
+          <td>${c.level ? `<span class="chip">${esc(c.level.name)}</span>` : '<span class="muted">—</span>'}</td>
+          <td class="num"><b>${num(c.openNow)}</b></td><td class="num">${num(c.openOlderThan30)}</td><td class="num">${num(sc.resolved)}</td>
+          <td class="num">${hours(sc.firstResponseH)}</td><td class="num">${hours(sc.resolutionH)}</td>
+          <td class="num">${percent(sc.jiraSlaPct)}</td><td class="num">${percent(sc.contractResolutionPct)}</td><td class="num">${percent(sc.noEscalationPct)}</td>
+          <td>${sparkline(c.series.slice(-13, -1).map((w) => w.backlog))}</td></tr>`;
+      }).join('')}`;
+      document.querySelectorAll('[data-client]').forEach((tr) => {
+        const open = () => { $('client').value = tr.dataset.client; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        tr.onclick = open;
+        tr.onkeydown = (event) => { if (event.key === 'Enter') open(); };
+      });
+    }
+  }
+
+  function renderEmpty(html) {
+    $('content').classList.add('hidden');
+    $('filters').classList.add('hidden');
+    $('empty').classList.remove('hidden');
+    $('empty').innerHTML = html;
+  }
+
+  async function load() {
+    data = await api('/api/impact?view=dashboard&weeks=104');
+    const { impact, sync } = data;
+    const last = sync.state && sync.state.lastRunAt ? new Date(sync.state.lastRunAt).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' }) : null;
+    $('subtitle').textContent = `${impact.clients.length} clientes PMC · semanas de lunes a domingo · datos de Jira${last ? ` al ${last}` : ''}`;
+    if (!impact.clients.length) {
+      renderEmpty('<h2>Todavía no hay clientes PMC</h2><p class="muted">Configura qué Organizations son clientes PMC, su nivel y su fecha de alta.</p><a class="btn primary" href="/clientes-pmc">Configurar clientes PMC</a>');
+      return;
+    }
+    if (!sync.facts.total) {
+      renderEmpty('<h2>Falta traer los datos de Jira</h2><p class="muted">La primera vez se cargan 2 años de historia. Se hace desde Clientes PMC → "Sincronizar ahora".</p><a class="btn primary" href="/clientes-pmc">Ir a sincronizar</a>');
+      return;
+    }
+    if (sync.state && sync.state.phase === 'backfill') showMsg('pageMsg', 'warn', 'Todavía se está cargando la historia de Jira: los números pueden estar incompletos.');
+    $('client').innerHTML = `<option value="">Todos los clientes PMC</option>${impact.clients.map((c) => `<option value="${esc(c.organizationId)}">${esc(c.name)}</option>`).join('')}`;
+    $('footnote').textContent = 'Todo se mide por equipo, nunca por persona. La semana en curso no se grafica hasta que termine. SLA de contrato en horas corridas según el nivel PMC del cliente.';
+    $('filters').classList.remove('hidden');
+    $('content').classList.remove('hidden');
+    render();
+  }
+
+  $('period').onchange = render;
+  $('client').onchange = render;
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => data && render(), 150); });
+  CS.onTheme(() => data && !$('content').classList.contains('hidden') && render());
+  CS.initPage().then(load).catch((error) => showMsg('pageMsg', 'err', error.message));
+})();
+</script>
+</body>
+</html>

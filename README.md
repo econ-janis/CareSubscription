@@ -24,6 +24,7 @@ lib/                       Común a todos los módulos
   recipients.js            validación de correos y dominios permitidos
   logo.js                  descarga y validación de la Logo URL
   auth.js / db.js / http.js / subscriptions.js
+  impact/                  Impacto Care: facts.js (métricas por ticket), sync.js (Jira -> Neon), metrics.js (semanas), store.js (tablas)
 modules/
   index.js                 registro de módulos
   ticket-report/           JQL, normalización de estados, agregación, dona PNG, plantilla, textos es/pt
@@ -170,6 +171,55 @@ Cada suscripción tiene el botón **💬 Avisar en #canal**. Publica en Slack un
   - `SLACK_CHANNEL`: nombre o ID del canal. Por defecto `#care-test`.
   - Para pasar a `#care-talks`, cambiar `SLACK_CHANNEL` y hacer Redeploy.
 - **Mensajes largos:** si el mensaje supera unos 3.800 caracteres, se cortan los últimos grupos y se indica cuántos tickets quedaron afuera.
+
+## Home, Clientes PMC e Impacto Care
+
+`/` es el **Home** con tres accesos:
+- **Suscripciones y envíos** (`/suscripciones`): lo que ya existía.
+- **Clientes PMC** (`/clientes-pmc`): configuración.
+- **Impacto Care** (`/impacto`): el dashboard.
+
+Audiencia interna (Consulting, Producto y Dirección), siempre con login de Janis.
+
+### Clientes PMC
+- **Clientes:** Organization de Jira, nivel, fecha de alta en PMC, logo y si está activo. "Buscar sugerencias en Jira" lista las Organizations con tickets marcados *Cuenta Janis: PMC* en los últimos 90 días que todavía no están cargadas.
+- **Niveles:** nombre y metas de SLA de contrato (primera respuesta y resolución, en horas corridas). Cada nivel define las metas de sus clientes.
+- **Cómo se calcula:**
+  - agentes de Care (por defecto Guardia, Joel, Mauricio y Erwin);
+  - proyectos de escalamiento (por defecto `HDI`);
+  - zona horaria para cortar las semanas (por defecto Buenos Aires).
+  Si cambian los agentes o el escalamiento, hay que usar **Recalcular todo**.
+- **Datos de Jira:** estado de la sincronización, **Sincronizar ahora** y **Recalcular todo**.
+
+### Datos y sincronización
+`lib/impact/sync.js` lee el proyecto JCS y guarda en `ticket_facts` **solo métricas por ticket**:
+- fechas de creación, resolución y primera respuesta;
+- Organizations;
+- SLA "Time to resolution" de Jira;
+- si se escaló.
+
+Nunca guarda resumen, descripción, comentarios ni personas. Los comentarios se leen en memoria para ubicar la primera respuesta y se descartan.
+- **Carga inicial:** 2 años, en partes de ~40 s (límite de 60 s de Vercel), con un cursor por fecha de creación. El botón "Sincronizar ahora" repite partes hasta terminar.
+- **Incremental:** los tickets actualizados desde la última corrida. Lo dispara el workflow horario (`.github/workflows/dispatch.yml`, mismo `CRON_SECRET`) o el botón.
+- Hay un lock para que no corran dos sincronizaciones a la vez.
+
+### Definiciones (todo por equipo, nunca por persona)
+- **Semana:** de lunes a domingo, en la zona horaria configurada. La semana en curso no se grafica.
+- **Primera respuesta real:** el primer comentario **público** de un agente de Care (según la lista configurada; nunca cuentas de clientes) **después del primer comentario**, que es la respuesta automática "en breve un Agente tomará este caso…". Se ignoran las notas internas y los comentarios del cliente. El SLA "Time to first response" de Jira no se usa porque lo detiene esa respuesta automática.
+- **SLA A (Jira):** % de resueltos sin incumplir "Time to resolution".
+- **SLA B (contrato):** % dentro de las metas del nivel PMC del cliente, en horas corridas. En primera respuesta, un ticket sin respuesta que ya pasó la meta cuenta como fuera de SLA.
+- **Resuelto sin escalar:** % de resueltos sin enlace a un ticket de los proyectos de escalamiento (HDI).
+- **Backlog:** tickets abiertos al cierre de cada semana; también se muestran los abiertos hace más de 30 días.
+- **Cancelados:** no cuentan como resueltos.
+- **Indicadores:** las últimas 4 semanas completas comparadas con las 4 anteriores.
+- **Antes y después de PMC:** las 12 semanas previas al alta contra las últimas 12 semanas.
+- **Logros de Care:** reglas automáticas:
+  - el backlog bajó al menos 10 % en 4 semanas;
+  - semana récord de resueltos;
+  - SLA de al menos 95 %;
+  - al menos 80 % resuelto sin escalar;
+  - primera respuesta al menos 20 % más rápida;
+  - clientes sin tickets abiertos de más de 30 días.
 
 ## Cómo sumar un módulo nuevo
 
