@@ -58,7 +58,7 @@ async function handleAction(action, req, res, user) {
 
 module.exports = async (req, res) => {
   try {
-    const user = await requireUser(req);
+    const user = await requireUser(req, res);
     const { id, view, action, historyId } = req.query || {};
 
     if (req.method === 'POST' && action === 'slack') {

@@ -36,7 +36,7 @@
     return;
   }
   if (response.status === 401) {
-    location.replace(`/?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+    location.replace(`/login?returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
     return;
   }
   const payload = await response.json().catch(() => ({}));
