@@ -1,6 +1,5 @@
 const { requireUser } = require('../lib/auth');
-const { validateGroupInput } = require('../lib/groups');
-const { validateInternalRecipients } = require('../lib/recipients');
+const { validateGroupInput, validateGroupRecipients } = require('../lib/groups');
 const { runGroup } = require('../lib/runner');
 const { isMailConfigured } = require('../lib/mailer');
 const { nextSlot } = require('../lib/schedule');
@@ -17,8 +16,8 @@ const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 // PUT    /api/groups?id=N                    -> modificar
 // DELETE /api/groups?id=N                    -> borrar
 // POST   /api/groups?action=preview          -> render con datos reales, sin enviar
-// POST   /api/groups?action=test             -> envía una prueba a un solo correo interno
-const AUDITED_FIELDS = ['name', 'recipients', 'subject', 'schedule', 'language', 'subscriptionIds', 'active'];
+// POST   /api/groups?action=test             -> envía una prueba a un solo correo (mismas reglas que los destinatarios)
+const AUDITED_FIELDS = ['name', 'recipients', 'subject', 'schedule', 'language', 'subscriptionIds', 'active', 'skipIfEmpty'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function diff(before, after) {
@@ -61,7 +60,8 @@ async function handleAction(action, req, res, user) {
 
   if (action === 'test') {
     if (!isMailConfigured()) throw new HttpError(503, 'El envío de correo todavía no está configurado; por ahora solo está disponible la vista previa');
-    const { recipients, errors } = validateInternalRecipients([body.testRecipient || user.email]);
+    // 1 suscripción: dominios de sus Organizations; 2 o más: solo internos.
+    const { recipients, errors } = await validateGroupRecipients([body.testRecipient || user.email], subscriptions);
     if (errors.length || recipients.length !== 1) throw new HttpError(400, errors[0] || 'Ingresá un solo correo para la prueba');
     const outcome = await runGroup(group, { kind: 'test', triggeredBy: user.email, testRecipient: recipients[0] });
     if (outcome.result !== 'ok') throw new HttpError(502, `No se pudo enviar la prueba: ${outcome.error}`);

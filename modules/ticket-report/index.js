@@ -153,6 +153,22 @@ async function build(subscription, { now = new Date(), mode = 'email' } = {}) {
   };
 }
 
+// Envío de 1 suscripción: el reporte individual con el idioma, el asunto y
+// la zona horaria del envío agrupado.
+async function buildSingle(groupConfig, subscription, { now = new Date(), mode = 'email' } = {}) {
+  const built = await build({
+    ...subscription,
+    language: groupConfig.language || 'es',
+    subject: groupConfig.subject || groupConfig.name,
+    schedule: groupConfig.schedule,
+  }, { now, mode });
+  return {
+    ...built,
+    snapshot: { ...built.snapshot, kind: 'single' },
+    failedSections: 0,
+  };
+}
+
 // Vista de un envío del historial, reconstruida desde su snapshot.
 async function renderSnapshot(snapshot) {
   const warnings = [];
@@ -169,7 +185,10 @@ module.exports = {
   renderSnapshot,
   // Mensaje del preaviso en Slack (tickets abiertos por Responsable).
   slackComment: (snapshot, context) => buildSlackComment(snapshot, { ...context, browseUrl }),
-  // Envío agrupado (spec §10): varias suscripciones en un solo correo.
-  buildGroup: group.buildGroup,
-  renderGroupSnapshot: group.renderGroupSnapshot,
+  // Envío agrupado (spec §10): 1 suscripción -> reporte individual (formato
+  // aprobado); 2 o más -> un correo con una sección por suscripción.
+  buildGroup: (groupConfig, subscriptions, options = {}) => (subscriptions.length === 1
+    ? buildSingle(groupConfig, subscriptions[0], options)
+    : group.buildGroup(groupConfig, subscriptions, options)),
+  renderGroupSnapshot: (snapshot) => (snapshot.kind === 'group' ? group.renderGroupSnapshot(snapshot) : renderSnapshot(snapshot)),
 };

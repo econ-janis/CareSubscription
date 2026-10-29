@@ -1,11 +1,8 @@
 const { requireUser } = require('../lib/auth');
 const { validateSubscriptionInput } = require('../lib/subscriptions');
-const { runSubscription, runSlackPreview } = require('../lib/runner');
+const { runSlackPreview, nextGroupSendFor } = require('../lib/runner');
 const { isSlackConfigured } = require('../lib/slack');
-const { validateRecipients } = require('../lib/recipients');
 const { getModule, listModules } = require('../modules');
-const { isMailConfigured } = require('../lib/mailer');
-const { nextSlot } = require('../lib/schedule');
 const db = require('../lib/db');
 const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 
@@ -17,11 +14,10 @@ const { sendJson, readBody, handleError, HttpError } = require('../lib/http');
 // PUT    /api/subscriptions?id=N            -> modificar
 // DELETE /api/subscriptions?id=N            -> borrar
 // POST   /api/subscriptions?action=preview  -> render con datos reales, sin enviar
-// POST   /api/subscriptions?action=test     -> envía una prueba a un solo correo (testRecipient;
-//                                             por defecto el del usuario), de un dominio permitido
+// (los envíos y sus pruebas se configuran en los envíos agrupados: api/groups.js)
 // POST   /api/subscriptions?action=slack&id=N -> preaviso en Slack (SLACK_CHANNEL) de una suscripción guardada
 // (todo en un archivo para no sumar Serverless Functions al plan Hobby)
-const AUDITED_FIELDS = ['title', 'organization', 'organizations', 'config', 'recipients', 'subject', 'schedule', 'language', 'active'];
+const AUDITED_FIELDS = ['title', 'organization', 'organizations', 'config'];
 
 function diff(before, after) {
   const changes = {};
@@ -47,27 +43,13 @@ async function validateOrFail(body, options) {
 
 async function handleAction(action, req, res, user) {
   const body = readBody(req);
-  const { data, warnings } = await validateOrFail(body, { checkRemote: false, requireRecipients: false });
+  const { data, warnings } = await validateOrFail(body, { checkRemote: false });
   const existing = body.id ? await db.getSubscription(parseId(body.id)) : null;
   const subscription = { ...data, id: existing ? existing.id : null, status: existing ? existing.status : 'ok', createdBy: existing ? existing.createdBy : user.email };
 
   if (action === 'preview') {
     const built = await getModule(data.module).build(subscription, { mode: 'preview' });
     sendJson(res, 200, { subject: built.subject, html: built.html, itemCount: built.itemCount, warnings: [...warnings, ...built.warnings] });
-    return;
-  }
-
-  if (action === 'test') {
-    if (!isMailConfigured()) throw new HttpError(503, 'El envío de correo todavía no está configurado; por ahora solo está disponible la vista previa');
-    // Mismas reglas que los destinatarios: dominio global o de la Organization.
-    const domains = await db.getOrganizationsDomains(data.organizations.map((o) => o.id));
-    const { recipients, errors } = validateRecipients([body.testRecipient || user.email], domains);
-    if (errors.length || recipients.length !== 1) throw new HttpError(400, errors[0] || 'Ingresá un solo correo para la prueba');
-    const [testRecipient] = recipients;
-
-    const outcome = await runSubscription(subscription, { kind: 'test', triggeredBy: user.email, testRecipient });
-    if (outcome.result !== 'ok') throw new HttpError(502, `No se pudo enviar la prueba: ${outcome.error}`);
-    sendJson(res, 200, { ok: true, sentTo: testRecipient, warnings });
     return;
   }
 
@@ -96,13 +78,7 @@ module.exports = async (req, res) => {
 
     if (req.method === 'GET') {
       if (!id) {
-        // Próximo envío: solo si la suscripción está activa y hay correo configurado.
-        const mailEnabled = isMailConfigured();
-        const subscriptions = (await db.listSubscriptions()).map((s) => ({
-          ...s,
-          nextSendAt: s.active && mailEnabled ? nextSlot(s.schedule) : null,
-        }));
-        sendJson(res, 200, { subscriptions, modules: listModules() });
+        sendJson(res, 200, { subscriptions: await db.listSubscriptions(), modules: listModules() });
         return;
       }
       const subscriptionId = parseId(id);
@@ -111,11 +87,12 @@ module.exports = async (req, res) => {
 
       if (view === 'history') {
         const [history, audit] = await Promise.all([db.listHistory(subscriptionId), db.listAudit('subscription', subscriptionId)]);
-        const mailEnabled = isMailConfigured();
+        const next = await nextGroupSendFor(subscriptionId);
         sendJson(res, 200, {
           history,
           audit,
-          nextSendAt: subscription.active && mailEnabled ? nextSlot(subscription.schedule) : null,
+          nextSendAt: next ? next.at : null,
+          nextSendTimezone: next ? next.timezone : null,
           snapshotRetentionDays: db.SNAPSHOT_RETENTION_DAYS,
         });
         return;

@@ -41,27 +41,29 @@ const base = { active: true, schedule: { days: [3], time: '09:00', timezone: 'Am
 
 test('envía slots pendientes; un fallo transitorio no marca el slot (se reintenta)', async () => {
   const { dispatch, calls } = loadDispatcher({
-    subscriptions: [
+    subscriptions: [],
+    groups: [
       { ...base, id: 1, lastSlotAt: null },
       { ...base, id: 2, lastSlotAt: '2026-10-28T12:00:00Z' },
       { ...base, id: 3, lastSlotAt: null },
       { ...base, id: 4, lastSlotAt: null },
     ],
-    outcomes: { 1: { result: 'ok' }, 3: { result: 'error', transient: true }, 4: { result: 'error', transient: false } },
+    outcomes: { g1: { result: 'ok' }, g3: { result: 'error', transient: true }, g4: { result: 'error', transient: false } },
   });
 
   const summary = await dispatch({ now: new Date('2026-10-28T12:10:00Z') });
 
-  assert.deepEqual(calls.runs.map(([id]) => id), [1, 3, 4]);
-  assert.deepEqual(calls.marked.map(([id]) => id), [1, 4]);
+  assert.deepEqual(calls.runs.map(([id]) => id), ['g1', 'g3', 'g4']);
+  assert.deepEqual(calls.marked.map(([id]) => id), ['g1', 'g4']);
   assert.equal(summary.sent, 1);
   assert.equal(summary.failed, 2);
 });
 
 test('sin SMTP configurado no envía ni consulta nada', async () => {
   const { dispatch, calls } = loadDispatcher({
-    subscriptions: [{ ...base, id: 1, lastSlotAt: null }],
-    outcomes: { 1: { result: 'ok' } },
+    subscriptions: [],
+    groups: [{ ...base, id: 1, lastSlotAt: null }],
+    outcomes: { g1: { result: 'ok' } },
     mailConfigured: false,
   });
 
@@ -72,16 +74,14 @@ test('sin SMTP configurado no envía ni consulta nada', async () => {
   assert.deepEqual(calls.marked, []);
 });
 
-test('también despacha envíos agrupados con slot pendiente', async () => {
+test('las suscripciones ya no se despachan solas: solo los envíos agrupados', async () => {
   const { dispatch, calls } = loadDispatcher({
-    subscriptions: [],
-    groups: [{ ...base, id: 1, lastSlotAt: null }, { ...base, id: 2, lastSlotAt: '2026-10-28T12:00:00Z' }],
-    outcomes: { g1: { result: 'ok' } },
+    subscriptions: [{ ...base, id: 7, lastSlotAt: null }],
+    groups: [],
+    outcomes: { 7: { result: 'ok' } },
   });
 
-  const summary = await dispatch({ now: new Date('2026-10-28T12:10:00Z') });
+  await dispatch({ now: new Date('2026-10-28T12:10:00Z') });
 
-  assert.deepEqual(calls.runs.map(([id]) => id), ['g1']);
-  assert.deepEqual(calls.marked.map(([id]) => id), ['g1']);
-  assert.equal(summary.sent, 1);
+  assert.deepEqual(calls.runs, []);
 });
