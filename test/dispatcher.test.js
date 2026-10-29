@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 // Dispatcher con db y runner simulados (sin red ni base de datos).
-function loadDispatcher({ subscriptions, outcomes, mailConfigured = true }) {
+function loadDispatcher({ subscriptions, outcomes, mailConfigured = true, groups = [] }) {
   const calls = { marked: [], runs: [] };
   const byId = new Map(subscriptions.map((s) => [s.id, s]));
   const stub = (file, exports) => {
@@ -16,12 +16,21 @@ function loadDispatcher({ subscriptions, outcomes, mailConfigured = true }) {
     acquireLock: async () => true,
     releaseLock: async () => {},
     markSlotDone: async (id, slot) => calls.marked.push([id, slot.toISOString()]),
+    listActiveGroups: async () => groups,
+    getGroup: async (id) => groups.find((g) => g.id === id),
+    acquireGroupLock: async () => true,
+    releaseGroupLock: async () => {},
+    markGroupSlotDone: async (id, slot) => calls.marked.push([`g${id}`, slot.toISOString()]),
   });
   stub('lib/mailer.js', { isMailConfigured: () => mailConfigured });
   stub('lib/runner.js', {
     runSubscription: async (s, options) => {
       calls.runs.push([s.id, options.slotAt.toISOString()]);
       return outcomes[s.id];
+    },
+    runGroup: async (g, options) => {
+      calls.runs.push([`g${g.id}`, options.slotAt.toISOString()]);
+      return outcomes[`g${g.id}`];
     },
   });
   delete require.cache[require.resolve('../lib/dispatcher')];
@@ -61,4 +70,18 @@ test('sin SMTP configurado no envía ni consulta nada', async () => {
   assert.equal(summary.mailDisabled, true);
   assert.deepEqual(calls.runs, []);
   assert.deepEqual(calls.marked, []);
+});
+
+test('también despacha envíos agrupados con slot pendiente', async () => {
+  const { dispatch, calls } = loadDispatcher({
+    subscriptions: [],
+    groups: [{ ...base, id: 1, lastSlotAt: null }, { ...base, id: 2, lastSlotAt: '2026-10-28T12:00:00Z' }],
+    outcomes: { g1: { result: 'ok' } },
+  });
+
+  const summary = await dispatch({ now: new Date('2026-10-28T12:10:00Z') });
+
+  assert.deepEqual(calls.runs.map(([id]) => id), ['g1']);
+  assert.deepEqual(calls.marked.map(([id]) => id), ['g1']);
+  assert.equal(summary.sent, 1);
 });

@@ -16,6 +16,10 @@
     "api/subscriptions.js": {
       "maxDuration": 60,
       "includeFiles": "{assets,config}/**"
+    },
+    "api/groups.js": {
+      "maxDuration": 60,
+      "includeFiles": "{assets,config}/**"
     }
   },
   "headers": [
@@ -35,6 +39,12 @@
           "value": "same-origin"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/reportes/:id/:date",
+      "destination": "/reporte.html"
     }
   ]
 }
