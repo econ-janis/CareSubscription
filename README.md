@@ -47,7 +47,7 @@ Los clientes de correo no ejecutan JS y muchos no muestran SVG, así que todo se
 
 ### Programación
 
-Cada suscripción define días de la semana, hora y zona horaria (por defecto `America/Santiago`). El dispatcher corre cada hora (`.github/workflows/dispatch.yml`, porque el plan Hobby de Vercel solo permite crons diarios). En cada corrida:
+Cada envío agrupado define días de la semana, hora y zona horaria (por defecto `America/Santiago`). Las suscripciones no se envían solas. El dispatcher corre cada hora (`.github/workflows/dispatch.yml`, porque el plan Hobby de Vercel solo permite crons diarios). En cada corrida:
 
 1. Calcula el último horario programado que ya pasó y lo envía si todavía no se mandó, siempre que no hayan pasado más de 6 h. Así un cron atrasado se recupera sin mandar envíos viejos.
 2. Toma un lock por suscripción para que dos corridas no envíen lo mismo.
@@ -96,12 +96,23 @@ Una suscripción puede abarcar más de una Organization, cada una con su logo. E
 - **Destinatarios:** se aceptan los dominios permitidos de cualquiera de las Organizations.
 - **Datos:** columna `subscriptions.organizations` (JSONB `[{ id, name, logoUrl }]`). La primera Organization también queda en `organization_id`, `organization_name` y `config.logoUrl`, para compatibilidad. Las suscripciones anteriores se leen como una sola Organization.
 
+## Suscripciones y envíos
+
+- **Suscripción = qué se reporta:** título, Organizations con sus logos, JQL y dominios permitidos de cada Organization. Tiene vista previa, historial y preaviso de Slack, pero **no se envía sola**.
+- **Envío agrupado = cuándo y a quién:** destinatarios, frecuencia, asunto, idioma, "Activo" y "No enviar si no hay tickets". Incluye **1 o N suscripciones**:
+  - **1 suscripción:** sale el reporte individual (formato del boceto aprobado). Acepta destinatarios del cliente: `janiscommerce.com` más los dominios permitidos de sus Organizations.
+  - **2 o más:** sale el formato agrupado (spec §10) y **solo destinatarios internos**.
+- **Migración automática (una sola vez):**
+  - Cada suscripción que tenía destinatarios pasó a un envío de 1 suscripción con su misma configuración, incluido el último horario enviado, así no se repiten ni se pierden envíos. Esos envíos figuran como modificados por "migración automática".
+  - La marca `subscriptions.migrated_to_group` evita recrear un envío que se borre después.
+  - El índice único `group_sends.legacy_subscription_id` evita duplicados.
+
 ## Envío agrupado (spec §10)
 
 Un solo correo con la información de varias suscripciones, una sección por Organization. Replica la maqueta `care-weekly-status-agrupado-ejemplo.html`.
 
-- **Modelo:** la entidad `group_sends` tiene título, destinatarios, frecuencia, idioma y suscripciones incluidas. Cada suscripción conserva su título, logo, JQL y Organization. Una suscripción **pausada** no se envía sola, pero sigue incluida en los agrupados.
-- **Solo destinatarios internos:** se aceptan solo direcciones de `INTERNAL_DOMAIN` (por defecto `janiscommerce.com`), sin importar los dominios permitidos de cada cliente. Se valida al guardar, al enviar y en las pruebas.
+- **Modelo:** la entidad `group_sends` tiene título, destinatarios, frecuencia, idioma, "no enviar si está vacío" y suscripciones incluidas. Cada suscripción conserva su título, sus logos, su JQL y sus Organizations.
+- **Solo destinatarios internos (con 2 o más suscripciones):** se aceptan solo direcciones de `INTERNAL_DOMAIN` (por defecto `janiscommerce.com`), sin importar los dominios permitidos de cada cliente. Se valida al guardar, al enviar y en las pruebas.
 - **Correo:** tiene, en este orden:
   - un header con el isotipo, el título, el subtítulo y **"Ver en la web ↗"**;
   - un bullet en forma de pill por Organization, con su logo y nombre, enlazado a `#org-<slug>`;

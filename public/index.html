@@ -118,27 +118,27 @@
     <div class="row" style="margin-bottom:16px;">
       <div>
         <h2>Suscripciones</h2>
-        <div class="muted">Reporte de tickets de los últimos 3 meses por Organization, enviado por correo de forma programada.</div>
+        <div class="muted">Qué se reporta de cada cliente: Organizations, logos y JQL. Cuándo y a quién se envía se configura en Envíos agrupados.</div>
       </div>
       <span class="spacer"></span>
       <button class="primary" id="newBtn">+ Nueva suscripción</button>
     </div>
-    <div id="mailBanner" class="msg warn hidden">El envío de correo todavía no está configurado: por ahora se pueden crear suscripciones y ver la vista previa, pero no se envía nada (ni programado ni de prueba).</div>
+    <div id="mailBanner" class="msg warn hidden">El envío de correo todavía no está configurado: por ahora se pueden crear suscripciones y envíos y ver la vista previa, pero no se envía nada (ni programado ni de prueba).</div>
     <div id="listMsg"></div>
     <div class="card table-wrap">
       <table class="list">
-        <thead><tr><th style="width:56px;"></th><th>Organization</th><th>Frecuencia</th><th>Envíos</th><th>Destinatarios</th><th>Estado</th><th>Última modificación</th><th></th></tr></thead>
-        <tbody id="listBody"><tr><td colspan="8" class="muted">Cargando…</td></tr></tbody>
+        <thead><tr><th style="width:56px;"></th><th>Organization</th><th>Envíos</th><th>Última modificación</th><th></th></tr></thead>
+        <tbody id="listBody"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody>
       </table>
     </div>
 
     <div class="row" style="margin:32px 0 16px;">
       <div>
         <h2>Envíos agrupados</h2>
-        <div class="muted">Varias suscripciones en un solo correo, solo para destinatarios internos (@janiscommerce.com).</div>
+        <div class="muted">Cuándo y a quién: una suscripción (reporte del cliente, puede ir a sus dominios) o varias en un solo correo (solo destinatarios @janiscommerce.com).</div>
       </div>
       <span class="spacer"></span>
-      <button class="primary" id="newGroupBtn">+ Nuevo envío agrupado</button>
+      <button class="primary" id="newGroupBtn">+ Nuevo envío</button>
     </div>
     <div id="groupMsg"></div>
     <div class="card table-wrap">
@@ -170,11 +170,10 @@
 
       <label for="f-jql">JQL <span class="req">*</span> <span class="muted">— se usa tal cual en Jira (opcional: <code>{organization}</code> = la primera Organization; <code>{organizations}</code> = todas, para <code>Organizations in {organizations}</code>)</span></label>
       <textarea id="f-jql" spellcheck="false"></textarea>
-      <div id="jqlWarn" class="msg warn hidden">El JQL no filtra por Organization: el reporte incluiría tickets de todos los clientes del proyecto y se enviaría a los destinatarios de esta suscripción.</div>
+      <div id="jqlWarn" class="msg warn hidden">El JQL no filtra por Organization: el reporte incluiría tickets de todos los clientes del proyecto y se enviaría a los destinatarios de sus envíos.</div>
 
-      <label for="f-recipients">Destinatarios <span class="req">*</span> <span class="muted">(uno por línea o separados por coma)</span></label>
-      <textarea id="f-recipients" style="min-height:70px;font-family:inherit;font-size:13px;" spellcheck="false"></textarea>
-      <div class="domains-box">
+      <label>Dominios permitidos <span class="muted">(para enviar el reporte a destinatarios del cliente desde un envío de esta sola suscripción)</span></label>
+      <div class="domains-box" style="margin-top:0;">
         <div class="row" style="gap:8px;">
           <span class="muted">Dominios permitidos para</span>
           <select id="f-domains-org" style="width:auto;min-width:200px;padding:4px 10px;"></select>
@@ -186,33 +185,10 @@
           <button type="button" id="saveDomains" disabled>Guardar dominios</button>
         </div>
       </div>
-
-      <div class="grid">
-        <div>
-          <label for="f-subject">Asunto del correo <span class="muted">(opcional · por defecto: el Título)</span></label>
-          <input type="text" id="f-subject" maxlength="250">
-        </div>
-        <div>
-          <label for="f-lang">Idioma <span class="req">*</span></label>
-          <select id="f-lang"><option value="es">Español</option><option value="pt">Português</option></select>
-        </div>
-      </div>
-
-      <label>Frecuencia <span class="req">*</span></label>
-      <div class="days" id="f-days"></div>
-      <div class="grid">
-        <div><label for="f-time">Hora</label><input type="time" id="f-time" value="09:00"></div>
-        <div><label for="f-tz">Zona horaria</label><select id="f-tz"></select></div>
-      </div>
-
-      <div>
-        <label class="check"><input type="checkbox" id="f-active" checked> Activa</label>
-        <label class="check"><input type="checkbox" id="f-skip"> No enviar si no hay tickets en el período</label>
-      </div>
+      <div class="muted" style="margin-top:12px;">Cuándo y a quién se envía se configura en <strong>Envíos agrupados</strong> (con esta sola suscripción o junto a otras).</div>
     </div>
     <div class="dlg-foot">
       <button type="button" id="previewBtn">Vista previa</button>
-      <button type="button" id="testBtn">Enviar prueba</button>
       <span class="spacer"></span>
       <button type="button" class="danger hidden" id="deleteBtn">Eliminar</button>
       <button type="button" data-close>Cancelar</button>
@@ -230,10 +206,10 @@
       <label for="g-name">Título <span class="req">*</span></label>
       <input type="text" id="g-name" maxlength="200" placeholder="Care Weekly Status — Clientes con PMC">
 
-      <label>Suscripciones incluidas <span class="req">*</span> <span class="muted">(una sección por Organization, en orden alfabético)</span></label>
+      <label>Suscripciones incluidas <span class="req">*</span> <span class="muted">(una: sale el reporte del cliente · varias: una sección por suscripción, en orden alfabético)</span></label>
       <div id="g-subs" class="sub-picker"></div>
 
-      <label for="g-recipients">Destinatarios <span class="req">*</span> <span class="muted">(solo @janiscommerce.com: el correo tiene datos de varios clientes)</span></label>
+      <label for="g-recipients">Destinatarios <span class="req">*</span> <span class="muted" id="g-recipients-hint">(con una suscripción: dominios del cliente; con varias: solo @janiscommerce.com)</span></label>
       <textarea id="g-recipients" style="min-height:70px;font-family:inherit;font-size:13px;" spellcheck="false"></textarea>
 
       <div class="grid">
@@ -253,7 +229,10 @@
         <div><label for="g-time">Hora</label><input type="time" id="g-time" value="09:00"></div>
         <div><label for="g-tz">Zona horaria</label><select id="g-tz"></select></div>
       </div>
-      <label class="check"><input type="checkbox" id="g-active" checked> Activo</label>
+      <div>
+        <label class="check"><input type="checkbox" id="g-active" checked> Activo</label>
+        <label class="check"><input type="checkbox" id="g-skip"> No enviar si no hay tickets en el período</label>
+      </div>
     </div>
     <div class="dlg-foot">
       <button type="button" id="groupPreviewBtn">Vista previa</button>
@@ -417,10 +396,8 @@
     $('logoutBtn').classList.remove('hidden');
     $('userEmail').textContent = user.email;
     $('mailBanner').classList.toggle('hidden', state.mailEnabled);
-    $('testBtn').disabled = !state.mailEnabled;
-    $('testBtn').title = state.mailEnabled ? '' : 'El envío de correo todavía no está configurado';
     $('groupTestBtn').disabled = !state.mailEnabled;
-    $('groupTestBtn').title = $('testBtn').title;
+    $('groupTestBtn').title = state.mailEnabled ? '' : 'El envío de correo todavía no está configurado';
     // Si vino de la landing de un envío agrupado, volver ahí después del login.
     const next = new URLSearchParams(location.search).get('next') || '';
     if (/^\/reportes\/\d+\/\d{4}-\d{2}-\d{2}/.test(next)) {
@@ -487,19 +464,23 @@
     }
   }
 
+  // Envíos (agrupados) que incluyen la suscripción, con su próximo envío.
+  function subscriptionSends(s) {
+    const groups = (state.groups || []).filter((g) => g.subscriptionIds.includes(s.id));
+    if (!groups.length) return '<span class="muted">No se envía: agregala a un envío</span>';
+    return groups.map((g) => `<div>✉ ${esc(g.name)}${g.active ? '' : ' <span class="pill off">Pausado</span>'}${g.nextSendAt ? `<div class="muted">Próximo: ${esc(fmtInTz(g.nextSendAt, g.schedule.timezone))}</div>` : ''}</div>`).join('');
+  }
+
   function renderList() {
     const body = $('listBody');
     if (!state.subscriptions.length) {
-      body.innerHTML = '<tr><td colspan="8" class="muted">Todavía no hay suscripciones.</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" class="muted">Todavía no hay suscripciones.</td></tr>';
       return;
     }
     body.innerHTML = state.subscriptions.map((s) => `<tr>
       <td title="${esc(s.title)}">${orgLogo(s)}</td>
       <td>${subOrgs(s).map((o) => esc(o.name)).join('<br>')}</td>
-      <td>${scheduleText(s.schedule)}</td>
-      <td style="white-space:nowrap;">${sendsText(s)}</td>
-      <td>${s.recipients.length}</td>
-      <td>${statusPill(s)}${s.status === 'error' ? `<div class="muted" style="color:var(--danger);max-width:240px;">${esc(s.lastError)}</div>` : ''}</td>
+      <td>${subscriptionSends(s)}</td>
       <td>${fmtDateTime(s.updatedAt)}<div class="muted">${esc(s.updatedBy)}</div></td>
       <td style="white-space:nowrap;">
         <button class="link" data-edit="${s.id}">Editar</button><button class="link" data-copy="${s.id}">Copiar</button><button class="link" data-history="${s.id}">Historial</button>
@@ -630,9 +611,7 @@
   });
 
   // ---- Formulario ----
-  $('f-days').innerHTML = [1, 2, 3, 4, 5, 6, 0].map((d) => `<label><input type="checkbox" value="${d}"><span>${DAY_NAMES[d]}</span></label>`).join('');
   const zones = (Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [DEFAULT_TZ]);
-  $('f-tz').innerHTML = zones.map((z) => `<option>${esc(z)}</option>`).join('');
 
   // Misma regla que filtersByOrganization (modules/ticket-report/jql.js).
   const ORGANIZATIONS_CLAUSE = /\borganizations\s*(=|!=|!~|~|\bin\b|\bnot\s+in\b|\bis\b)/i;
@@ -653,14 +632,6 @@
     $('orgRows').innerHTML = '';
     (subscription ? subOrgs(s) : [{ id: '', name: '', logoUrl: '' }]).forEach((o) => addOrgRow(o));
     $('f-jql').value = s.config.jql || '';
-    $('f-recipients').value = s.recipients.join('\n');
-    $('f-subject').value = s.subject;
-    $('f-lang').value = s.language;
-    $('f-time').value = s.schedule.time;
-    $('f-tz').value = s.schedule.timezone;
-    $('f-active').checked = s.active;
-    $('f-skip').checked = Boolean(s.config.skipIfEmpty);
-    $('f-days').querySelectorAll('input').forEach((i) => { i.checked = s.schedule.days.includes(Number(i.value)); });
     $('deleteBtn').classList.toggle('hidden', !state.editing);
     $('f-jql').oninput();
     clearMsg('formMsg');
@@ -676,16 +647,7 @@
       module: 'ticket-report',
       title: $('f-title').value,
       organizations: orgRowsValue(),
-      config: { jql: $('f-jql').value, skipIfEmpty: $('f-skip').checked },
-      recipients: $('f-recipients').value,
-      subject: $('f-subject').value,
-      language: $('f-lang').value,
-      schedule: {
-        days: [...$('f-days').querySelectorAll('input:checked')].map((i) => Number(i.value)),
-        time: $('f-time').value,
-        timezone: $('f-tz').value,
-      },
-      active: $('f-active').checked,
+      config: { jql: $('f-jql').value },
     };
   }
 
@@ -749,10 +711,6 @@
     $('testDlg').showModal();
     $('t-email').select();
   }
-  $('testBtn').onclick = () => openTestDialog({
-    url: '/api/subscriptions?action=test', payload: formPayload, msg: 'formMsg',
-    hint: 'Un solo correo, de un dominio permitido para esta Organization. Se envía el reporte con los datos actuales; no se guarda la suscripción.',
-  });
 
   $('testForm').onsubmit = (event) => {
     event.preventDefault();
@@ -783,13 +741,13 @@
     $('historyRetention').textContent = '';
     $('historyDlg').showModal();
     try {
-      const { history, audit, nextSendAt, snapshotRetentionDays } = await api(`/api/subscriptions?id=${subscription.id}&view=history`);
+      const { history, audit, nextSendAt, nextSendTimezone, snapshotRetentionDays } = await api(`/api/subscriptions?id=${subscription.id}&view=history`);
       if (nextSendAt) {
-        showMsg('historyNext', 'ok', `Próximo envío programado: ${fmtInTz(nextSendAt, subscription.schedule.timezone)} (${subscription.schedule.timezone})`);
+        showMsg('historyNext', 'ok', `Próximo envío programado: ${fmtInTz(nextSendAt, nextSendTimezone)} (${nextSendTimezone})`);
       } else {
-        showMsg('historyNext', 'warn', subscription.active ? 'Sin envíos programados: el envío de correo no está configurado.' : 'Suscripción pausada: no hay envíos programados.');
+        showMsg('historyNext', 'warn', state.mailEnabled ? 'Sin envíos programados: agregala a un envío activo.' : 'Sin envíos programados: el envío de correo no está configurado.');
       }
-      $('historyRetention').textContent = `La vista de cada correo enviado se conserva ${snapshotRetentionDays} días.`;
+      $('historyRetention').textContent = `Envíos anteriores de la suscripción y preavisos de Slack (los envíos nuevos quedan en el historial de cada envío). La vista se conserva ${snapshotRetentionDays} días.`;
 
       $('historyBody').innerHTML = history.length ? history.map((h) => `<tr>
         <td style="white-space:nowrap;">${fmtDateTime(h.sentAt)}</td>
@@ -841,6 +799,7 @@
       state.groups = groups;
       clearMsg('groupMsg');
       renderGroups();
+      renderList();
     } catch (error) {
       errorMsg('groupMsg', error);
     }
@@ -878,10 +837,25 @@
       : '<div class="muted" style="padding:8px;">Primero creá suscripciones por Organization.</div>';
   }
 
+  // Con 1 suscripción: dominios de sus Organizations; con varias: solo internos.
+  function selectedSubscriptions() {
+    return [...$('g-subs').querySelectorAll('input:checked')].map((i) => subscriptionById(Number(i.value))).filter(Boolean);
+  }
+  function groupRecipientsHint() {
+    const selected = selectedSubscriptions();
+    if (selected.length === 1) return `(una suscripción: @janiscommerce.com y los dominios permitidos de ${subOrgNames(selected[0])})`;
+    if (selected.length > 1) return '(varias suscripciones: solo @janiscommerce.com, el correo tiene datos de varios clientes)';
+    return '(con una suscripción: dominios del cliente; con varias: solo @janiscommerce.com)';
+  }
+  function updateGroupRecipientsHint() {
+    $('g-recipients-hint').textContent = groupRecipientsHint();
+  }
+  $('g-subs').onchange = updateGroupRecipientsHint;
+
   function openGroupForm(group) {
     state.editingGroup = group || null;
     const g = group || { name: '', recipients: [state.user.email], subject: '', schedule: { days: [1], time: '09:00', timezone: DEFAULT_TZ }, language: 'es', subscriptionIds: [], active: true };
-    $('groupFormTitle').textContent = group ? 'Editar envío agrupado' : 'Nuevo envío agrupado';
+    $('groupFormTitle').textContent = group ? 'Editar envío' : 'Nuevo envío';
     $('g-name').value = g.name;
     $('g-recipients').value = g.recipients.join('\n');
     $('g-subject').value = g.subject;
@@ -889,8 +863,10 @@
     $('g-time').value = g.schedule.time;
     $('g-tz').value = g.schedule.timezone;
     $('g-active').checked = g.active;
+    $('g-skip').checked = Boolean(g.skipIfEmpty);
     $('g-days').querySelectorAll('input').forEach((i) => { i.checked = g.schedule.days.includes(Number(i.value)); });
     renderSubscriptionPicker(g.subscriptionIds);
+    updateGroupRecipientsHint();
     $('groupDeleteBtn').classList.toggle('hidden', !group);
     clearMsg('groupFormMsg');
     $('groupDlg').showModal();
@@ -911,6 +887,7 @@
         timezone: $('g-tz').value,
       },
       active: $('g-active').checked,
+      skipIfEmpty: $('g-skip').checked,
     };
   }
 
@@ -963,7 +940,7 @@
 
   $('groupTestBtn').onclick = () => openTestDialog({
     url: '/api/groups?action=test', payload: groupPayload, msg: 'groupFormMsg',
-    hint: 'Un solo correo @janiscommerce.com (el correo tiene datos de varios clientes). No se guarda el envío agrupado.',
+    hint: `Un solo correo ${groupRecipientsHint()}. No se guarda el envío.`,
   });
 
   function landingPath(group, entry) {

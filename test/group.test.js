@@ -74,7 +74,9 @@ test('landing (mode web): sin "Ver en la web"', () => {
 });
 
 // runGroup con db, mailer y módulo simulados.
-function loadRunner({ subscriptions = [{ id: 1 }], built }) {
+const sub = (id, orgId) => ({ id, organization: { id: orgId, name: `Org ${orgId}` }, organizations: [{ id: orgId, name: `Org ${orgId}`, logoUrl: '' }] });
+
+function loadRunner({ subscriptions = [sub(1, '10'), sub(2, '20')], built, orgDomains = [] }) {
   const calls = { sent: [], history: [] };
   const stub = (file, exports) => {
     const id = require.resolve(path.join(__dirname, '..', file));
@@ -84,11 +86,12 @@ function loadRunner({ subscriptions = [{ id: 1 }], built }) {
     getSubscriptionsByIds: async () => subscriptions,
     addHistory: async (entry) => calls.history.push(entry),
     getOrganizationDomains: async () => [],
-    getOrganizationsDomains: async () => [],
+    getOrganizationsDomains: async () => orgDomains,
   });
   stub('lib/mailer.js', { sendMail: async (mail) => calls.sent.push(mail), isMailConfigured: () => true });
   stub('modules/index.js', { getModule: () => ({ buildGroup: async (group, subs, options) => ({ subject: 'S', html: '<p>', text: '', attachments: [], snapshot: { webUrl: options.webUrl }, itemCount: 3, failedSections: 0, warnings: [], ...built }) }) });
   delete require.cache[require.resolve('../lib/runner')];
+  delete require.cache[require.resolve('../lib/groups')];
   return { runGroup: require('../lib/runner').runGroup, calls };
 }
 
@@ -104,16 +107,35 @@ test('runGroup: envía, registra el historial y arma el link a la landing', asyn
   assert.equal(calls.history[0].snapshot.webUrl, 'https://app.test/reportes/5/2026-10-29');
 });
 
-test('runGroup: nunca envía a destinatarios externos', async () => {
-  const { runGroup, calls } = loadRunner({});
+test('runGroup con 2 o más suscripciones: nunca envía a destinatarios externos', async () => {
+  const { runGroup, calls } = loadRunner({ orgDomains: ['carrefour.com'] });
   const outcome = await runGroup({ ...group, recipients: ['x@carrefour.com'] });
   assert.equal(outcome.result, 'error');
   assert.equal(outcome.transient, false);
+  assert.match(outcome.error, /Solo destinatarios @janiscommerce\.com/);
   assert.equal(calls.sent.length, 0);
 });
 
+test('runGroup con 1 suscripción: acepta los dominios permitidos de sus Organizations', async () => {
+  const ok = loadRunner({ subscriptions: [sub(1, '10')], orgDomains: ['carrefour.com'] });
+  assert.equal((await ok.runGroup({ ...group, recipients: ['x@carrefour.com'] })).result, 'ok');
+  assert.deepEqual(ok.calls.sent[0].to, ['x@carrefour.com']);
+
+  const blocked = loadRunner({ subscriptions: [sub(1, '10')], orgDomains: ['carrefour.com'] });
+  assert.equal((await blocked.runGroup({ ...group, recipients: ['x@gmail.com'] })).result, 'error');
+  assert.equal(blocked.calls.sent.length, 0);
+});
+
+test('runGroup: "no enviar si está vacío" en envíos programados', async () => {
+  const { runGroup, calls } = loadRunner({ built: { itemCount: 0 } });
+  const outcome = await runGroup({ ...group, skipIfEmpty: true }, { kind: 'scheduled' });
+  assert.equal(outcome.result, 'skipped');
+  assert.equal(calls.sent.length, 0);
+  assert.equal(calls.history[0].result, 'skipped');
+});
+
 test('runGroup: si fallan todas las Organizations no envía y se reintenta', async () => {
-  const { runGroup, calls } = loadRunner({ built: { failedSections: 1 } });
+  const { runGroup, calls } = loadRunner({ built: { failedSections: 2 } });
   const outcome = await runGroup(group);
   assert.equal(outcome.result, 'error');
   assert.equal(outcome.transient, true);
