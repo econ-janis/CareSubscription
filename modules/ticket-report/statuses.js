@@ -13,7 +13,8 @@ function loadStatusConfig(raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
   raw.statuses.forEach((status, index) => {
     for (const alias of status.aliases) byAlias.set(normalizeName(alias), { ...status, order: index });
   });
-  return { statuses: raw.statuses.map((s, order) => ({ ...s, order })), unknown: raw.unknown, byAlias };
+  const chartOrder = raw.chartOrder || raw.statuses.map((s) => s.key);
+  return { statuses: raw.statuses.map((s, order) => ({ ...s, order })), unknown: raw.unknown, chartOrder, byAlias };
 }
 
 // Nombre de Jira -> estado conocido, o null si no está en la tabla.

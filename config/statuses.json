@@ -1,57 +1,119 @@
 {
-  "_comment": "Normalización de estados de Jira para el módulo ticket-report. El orden de la lista es el orden del reporte. 'aliases' se compara sin distinguir mayúsculas ni tildes. 'open': true = aparece en la tabla de tickets abiertos.",
+  "_comment": "Normalización de estados de Jira para el módulo ticket-report. El orden de la lista es el orden del reporte y de los tickets abiertos. 'aliases' se compara sin distinguir mayúsculas ni tildes. 'open': true = cuenta como abierto y aparece en la tabla de tickets abiertos. 'hideWhenZero': no se muestra el estado si no tiene tickets. 'chartOrder': orden de los segmentos en la dona y la barra del envío agrupado.",
   "unknown": {
     "color": "#9AA3B2",
     "textColor": "#FFFFFF"
   },
+  "chartOrder": [
+    "resolved",
+    "review",
+    "waiting-info",
+    "in-development",
+    "in-progress",
+    "todo",
+    "cancelled"
+  ],
   "statuses": [
     {
       "key": "todo",
-      "label": { "es": "Por Hacer", "pt": "A Fazer" },
-      "aliases": ["Por Hacer", "To Do"],
+      "label": {
+        "es": "Por Hacer",
+        "pt": "A Fazer"
+      },
+      "aliases": [
+        "Por Hacer",
+        "To Do"
+      ],
       "color": "#FF3200",
       "textColor": "#FFFFFF",
       "open": true
     },
     {
       "key": "in-progress",
-      "label": { "es": "En Progreso", "pt": "Em Andamento" },
-      "aliases": ["En Progreso", "In Progress"],
+      "label": {
+        "es": "En Progreso",
+        "pt": "Em Andamento"
+      },
+      "aliases": [
+        "En Progreso",
+        "In Progress"
+      ],
       "color": "#FF6E08",
       "textColor": "#FFFFFF",
       "open": true
     },
     {
       "key": "waiting-info",
-      "label": { "es": "Esperando Información", "pt": "Aguardando Informação" },
-      "aliases": ["Esperando Información", "Esperando Informacion"],
+      "label": {
+        "es": "Esperando Información",
+        "pt": "Aguardando Informação"
+      },
+      "aliases": [
+        "Esperando Información",
+        "Esperando Informacion"
+      ],
       "color": "#33415C",
       "textColor": "#FFFFFF",
       "open": true
     },
     {
       "key": "in-development",
-      "label": { "es": "En Desarrollo", "pt": "Em Desenvolvimento" },
-      "aliases": ["En Desarrollo"],
+      "label": {
+        "es": "En Desarrollo",
+        "pt": "Em Desenvolvimento"
+      },
+      "aliases": [
+        "En Desarrollo"
+      ],
       "color": "#F5C400",
       "textColor": "#001233",
       "open": true
     },
     {
       "key": "review",
-      "label": { "es": "Revisión", "pt": "Revisão" },
-      "aliases": ["Revision", "Revisión"],
+      "label": {
+        "es": "Revisión",
+        "pt": "Revisão"
+      },
+      "aliases": [
+        "Revision",
+        "Revisión"
+      ],
       "color": "#7CB83A",
       "textColor": "#FFFFFF",
       "open": true
     },
     {
       "key": "resolved",
-      "label": { "es": "Resuelto", "pt": "Resolvido" },
-      "aliases": ["Resuelto", "Done", "Cerrado"],
+      "label": {
+        "es": "Resuelto",
+        "pt": "Resolvido"
+      },
+      "aliases": [
+        "Resuelto",
+        "Done",
+        "Cerrado"
+      ],
       "color": "#2979FF",
       "textColor": "#FFFFFF",
       "open": false
+    },
+    {
+      "key": "cancelled",
+      "label": {
+        "es": "Cancelada",
+        "pt": "Cancelada"
+      },
+      "aliases": [
+        "Cancelada",
+        "Cancelado",
+        "Canceled",
+        "Cancelled"
+      ],
+      "color": "#9AA3B2",
+      "textColor": "#FFFFFF",
+      "open": false,
+      "hideWhenZero": true
     }
   ]
 }

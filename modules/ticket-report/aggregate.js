@@ -3,8 +3,9 @@ const { resolveStatus } = require('./statuses');
 // Arma el modelo del reporte a partir de los issues de Jira (solo se usan
 // key, summary, status y created; nada de esto se persiste).
 //
-// - rows: todos los estados configurados (aunque estén en 0) + los estados
-//   desconocidos con valor, en gris y con su nombre original.
+// - rows: todos los estados configurados (aunque estén en 0, salvo los
+//   marcados `hideWhenZero`) + los estados desconocidos con valor, en gris y
+//   con su nombre original. `open` indica si el estado cuenta como abierto.
 // - openTickets: solo estados marcados `open`, ordenados por estado y
 //   después por fecha de creación ascendente.
 function aggregate(issues, statusConfig, language = 'es', { onUnknownStatus = () => {} } = {}) {
@@ -40,7 +41,7 @@ function aggregate(issues, statusConfig, language = 'es', { onUnknownStatus = ()
   const pct = (value) => (total ? (value * 100) / total : 0);
 
   const rows = [
-    ...statusConfig.statuses.map((s) => ({
+    ...statusConfig.statuses.filter((s) => counts.get(s.key) > 0 || !s.hideWhenZero).map((s) => ({
       key: s.key,
       label: s.label[language] || s.label.es,
       color: s.color,
@@ -48,6 +49,7 @@ function aggregate(issues, statusConfig, language = 'es', { onUnknownStatus = ()
       total: counts.get(s.key),
       percent: pct(counts.get(s.key)),
       known: true,
+      open: Boolean(s.open),
     })),
     ...[...unknown.entries()].map(([name, value]) => ({
       key: `unknown:${name}`,
@@ -57,6 +59,7 @@ function aggregate(issues, statusConfig, language = 'es', { onUnknownStatus = ()
       total: value,
       percent: pct(value),
       known: false,
+      open: false,
     })),
   ];
 

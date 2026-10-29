@@ -86,4 +86,55 @@ function renderDonutPng(segments, total, centerLabel, theme = 'light') {
   return resvg.render().asPng();
 }
 
-module.exports = { buildDonutSvg, renderDonutPng, DISPLAY_SIZE };
+// Dona chica del envío agrupado (v2): 96 px mostrada, PNG 2x (192 px) para
+// pantallas retina. Geometría de la maqueta aprobada (viewBox 100, R=46,
+// r=32), sin etiquetas sobre los segmentos, total al centro y fondo
+// transparente (va sobre el fondo gris del correo).
+const SMALL = { display: 96, view: 100, c: 50, outer: 46, inner: 32 };
+
+function smallPoint(radius, angle) {
+  return [SMALL.c + radius * Math.cos(angle), SMALL.c + radius * Math.sin(angle)];
+}
+
+function smallArc(start, end) {
+  const large = end - start > Math.PI ? 1 : 0;
+  const [x0, y0] = smallPoint(SMALL.outer, start);
+  const [x1, y1] = smallPoint(SMALL.outer, end);
+  const [x2, y2] = smallPoint(SMALL.inner, end);
+  const [x3, y3] = smallPoint(SMALL.inner, start);
+  const f = (n) => n.toFixed(2);
+  return `M${f(x0)},${f(y0)}A${SMALL.outer},${SMALL.outer} 0 ${large} 1 ${f(x1)},${f(y1)}L${f(x2)},${f(y2)}A${SMALL.inner},${SMALL.inner} 0 ${large} 0 ${f(x3)},${f(y3)}Z`;
+}
+
+// segments: [{ total, color }] en el orden del gráfico, solo con total > 0.
+function buildSmallDonutSvg(segments, total) {
+  const parts = [];
+  const middle = (SMALL.outer + SMALL.inner) / 2;
+  const width = SMALL.outer - SMALL.inner;
+  if (!total) {
+    parts.push(`<circle cx="${SMALL.c}" cy="${SMALL.c}" r="${middle}" fill="none" stroke="#E3E6EB" stroke-width="${width}"/>`);
+  } else if (segments.length === 1) {
+    parts.push(`<circle cx="${SMALL.c}" cy="${SMALL.c}" r="${middle}" fill="none" stroke="${segments[0].color}" stroke-width="${width}"/>`);
+  } else {
+    let start = -Math.PI / 2;
+    for (const s of segments) {
+      const end = start + (s.total / total) * 2 * Math.PI;
+      parts.push(`<path d="${smallArc(start, end)}" fill="${s.color}" stroke="#FFFFFF" stroke-width="1"/>`);
+      start = end;
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SMALL.view}" height="${SMALL.view}" viewBox="0 0 ${SMALL.view} ${SMALL.view}">
+${parts.join('\n')}
+<text x="${SMALL.c}" y="${SMALL.c + 7}" text-anchor="middle" font-family="Inter" font-size="20" font-weight="700" fill="#001233">${total}</text>
+</svg>`;
+}
+
+function renderSmallDonutPng(segments, total) {
+  const resvg = new Resvg(buildSmallDonutSvg(segments, total), {
+    fitTo: { mode: 'width', value: SMALL.display * SCALE },
+    font: { fontFiles: FONT_FILES, loadSystemFonts: false, defaultFontFamily: 'Inter' },
+  });
+  return resvg.render().asPng();
+}
+
+module.exports = { buildDonutSvg, renderDonutPng, buildSmallDonutSvg, renderSmallDonutPng, DISPLAY_SIZE, SMALL_DISPLAY_SIZE: SMALL.display };

@@ -4,7 +4,7 @@ const path = require('node:path');
 const { slugify, uniqueSlugs } = require('../lib/slug');
 const { validateInternalRecipients } = require('../lib/recipients');
 const { renderGroupHtml } = require('../modules/ticket-report/group-template');
-const { sortSubscriptions } = require('../modules/ticket-report/group');
+const { sortSubscriptions, sectionStats, displayName } = require('../modules/ticket-report/group');
 const { loadStatusConfig } = require('../modules/ticket-report/statuses');
 const { aggregate } = require('../modules/ticket-report/aggregate');
 
@@ -27,10 +27,39 @@ test('orden alfabético por Organization', () => {
   assert.deepEqual(sortSubscriptions([sub('Zeta', 'b'), sub('alfa', 'x'), sub('Beta', 'a')]).map((s) => s.organization.name), ['alfa', 'Beta', 'Zeta']);
 });
 
+const statusConfig = loadStatusConfig();
 const report = aggregate([
   { key: 'JCS-1', fields: { summary: 'Falla <b>', status: { name: 'To Do' }, created: '2026-01-01' } },
   { key: 'JCS-2', fields: { summary: 'Hecho', status: { name: 'Done' }, created: '2026-01-01' } },
-], loadStatusConfig(), 'es');
+  { key: 'JCS-3', fields: { summary: 'Otro', status: { name: 'Done' }, created: '2026-01-02' } },
+  { key: 'JCS-4', fields: { summary: 'Revisar', status: { name: 'REVISIÓN' }, created: '2026-01-03' } },
+  { key: 'JCS-5', fields: { summary: 'No va', status: { name: 'Cancelada' }, created: '2026-01-04' } },
+], statusConfig, 'es');
+
+test('sectionStats: resueltos, abiertos, cancelados y segmentos en el orden del gráfico', () => {
+  const { stats, segments } = sectionStats(report, statusConfig);
+  assert.deepEqual(stats, { total: 5, resolved: 2, open: 2, cancelled: 1 });
+  assert.deepEqual(segments.map((s) => s.key), ['resolved', 'review', 'todo', 'cancelled']);
+  assert.equal(segments.reduce((sum, s) => sum + s.total, 0), stats.total);
+});
+
+test('Cancelada solo aparece si tiene tickets; ESPERANDO INFORMACIÓN se normaliza', () => {
+  const empty = aggregate([{ key: 'A', fields: { status: { name: 'ESPERANDO INFORMACIÓN' } } }], statusConfig, 'es');
+  assert.ok(!empty.rows.some((r) => r.key === 'cancelled'));
+  assert.equal(empty.rows.find((r) => r.key === 'waiting-info').total, 1);
+  assert.ok(report.rows.some((r) => r.key === 'cancelled' && r.total === 1));
+});
+
+test('nombre visible: título sin el prefijo común', () => {
+  assert.equal(displayName('Care Weekly Status — Carrefour Argentina · PMC Gold'), 'Carrefour Argentina · PMC Gold');
+  assert.equal(displayName('Carrefour Argentina'), 'Carrefour Argentina');
+  assert.equal(displayName('', 'Org'), 'Org');
+});
+
+function section(slug, name, withReport = true) {
+  const { stats, segments } = withReport ? sectionStats(report, statusConfig) : { stats: null, segments: [] };
+  return { slug, name, title: `${name} · PMC Gold`, logos: ['cid:logo'], chart: withReport ? 'cid:chart' : '', stats, segments, openTickets: withReport ? report.openTickets : [] };
+}
 
 function render(overrides = {}) {
   return renderGroupHtml({
@@ -40,37 +69,50 @@ function render(overrides = {}) {
     webUrl: 'https://app.test/reportes/5/2026-10-29',
     mode: 'email',
     browseUrl: (k) => `https://j.test/browse/${k}`,
-    images: { iso: 'cid:iso', footer: 'cid:footer' },
-    sections: [
-      { slug: 'cliente-alfa', name: 'Cliente Alfa', subscriptionTitle: 'Care Weekly — Cliente Alfa', logo: 'cid:logo-a', chart: 'cid:chart-a', report },
-      { slug: 'cliente-beta', name: 'Cliente Beta', subscriptionTitle: 'Care Weekly — Cliente Beta', logo: 'cid:iso', chart: '', report: null },
-    ],
+    images: { iso: 'https://app.test/brand/janis-iso.png', footer: 'https://app.test/brand/janis-logo.png' },
+    legendItems: [{ label: 'Resuelto', color: '#2979FF' }, { label: 'Cancelada', color: '#9AA3B2' }],
+    sections: [section('cliente-alfa', 'Cliente Alfa'), section('cliente-beta', 'Cliente Beta', false)],
     ...overrides,
   });
 }
 
-test('correo agrupado: bullets enlazados a anclas, secciones, volver arriba y "Ver en la web"', () => {
+test('correo agrupado v2: resumen con anclas, barra, totales, secciones y "Ver en la web"', () => {
   const html = render();
   for (const slug of ['cliente-alfa', 'cliente-beta']) {
-    assert.ok(html.includes(`href="#org-${slug}"`), `bullet ${slug}`);
-    assert.ok(html.includes(`<a name="org-${slug}" id="org-${slug}"></a>`), `ancla ${slug}`);
+    assert.ok(html.includes(`href="#org-${slug}"`), `enlace ${slug}`);
+    assert.ok(html.includes(`<td id="org-${slug}"`) && html.includes(`<a name="org-${slug}"`), `ancla ${slug}`);
   }
   assert.equal((html.match(/href="#inicio"/g) || []).length, 2);
-  assert.ok(html.includes('<a name="inicio" id="inicio"></a>'));
-  assert.ok(html.includes('background:#A9B2C0'));
+  assert.ok(html.includes('<a name="inicio"'));
+  assert.ok(html.includes('max-width:680px'));
+  assert.ok(html.includes('Tickets creados en los últimos 3 meses · Corte: 29 oct 2026'));
   assert.ok(html.includes('href="https://app.test/reportes/5/2026-10-29"'));
   assert.ok(html.includes('Ver en la web ↗'));
+  // Barra apilada por celdas con bgcolor; 2/5 resueltos = 40 %.
+  assert.ok(html.includes('<td width="40.00%" height="8" bgcolor="#2979FF"'));
+  // Fila de la Organization que falló: "—"; la fila Total suma solo las que respondieron.
+  assert.ok(html.includes('>—</td>'));
+  assert.ok(/>Total<\/td><td[^>]*>5<\/td><td[^>]*>2<\/td><td[^>]*>2<\/td>/.test(html));
+  assert.ok(html.includes('5 tickets · 2 resueltos (40 %) · <b>2 abiertos</b> · 1 cancelado'));
+  assert.ok(html.includes('Cliente Alfa · PMC Gold'));
   assert.ok(html.includes('No se pudo obtener la información.'));
+  assert.ok(html.includes('Tickets Abiertos'));
+  // Pills y puntos con background-color inline (Gmail).
+  assert.ok(html.includes('<span style="background-color:#FF3200;color:#FFFFFF;border-radius:999px;'));
+  assert.ok(html.includes('background-color:#9AA3B2'));
   assert.ok(html.includes('Care Weekly &lt;Status&gt;'));
   assert.ok(html.includes('Falla &lt;b&gt;'));
   assert.ok(!html.includes('base64'));
-  // Bullets: solo logo + nombre (sin contadores).
-  assert.ok(/<img src="cid:logo-a"[^>]*>Cliente Alfa<\/a>/.test(html));
+  assert.ok(!html.includes('<style'));
+  assert.ok(!html.includes('<svg'));
+  assert.ok(!html.includes('Detalle por estado'));
 });
 
-test('landing (mode web): sin "Ver en la web"', () => {
+test('landing (mode web): sin "Ver en la web"; sin abiertos: "Sin tickets abiertos."', () => {
   assert.ok(!render({ mode: 'web' }).includes('Ver en la web'));
   assert.ok(!render({ webUrl: '' }).includes('Ver en la web'));
+  const none = render({ sections: [{ ...section('a', 'A'), openTickets: [] }] });
+  assert.ok(none.includes('Sin tickets abiertos.'));
 });
 
 // runGroup con db, mailer y módulo simulados.
